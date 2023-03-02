@@ -1,0 +1,10 @@
+version: '3.4'
+
+services:
+  csv_automation:
+    image: csv_automation
+    env_file:
+      - .env
+    build:
+      context: .
+      dockerfile: ./Dockerfile
