@@ -49,7 +49,7 @@ def ETL_applications_csv(PRISMA_TOKEN: str) -> list[dict]:
 
             if "externalLabels" in container["info"]:
                 for label in container["info"]["externalLabels"]:
-                    if label["key"] == "app_id":
+                    if label["key"] == "hcsc.co/application_id":
                         APP_ID_EXTERNAL_LABEL = label["value"]
                         app_id_exists = True
                         break
@@ -85,8 +85,12 @@ def ETL_applications_csv(PRISMA_TOKEN: str) -> list[dict]:
             # Build out the App ID
             if "cluster" in container["info"]:
                 CLUSTER = container["info"]["cluster"]
+            else:
+                CLUSTER = ""
             if "namespace" in container["info"]:
                 NAMESPACE = container["info"]["namespace"]
+            else:
+                NAMESPACE = ""
 
             app_id_exists = False
 
@@ -94,7 +98,7 @@ def ETL_applications_csv(PRISMA_TOKEN: str) -> list[dict]:
 
             if "externalLabels" in container["info"]:
                 for label in container["info"]["externalLabels"]:
-                    if label["key"] == "app_id":
+                    if label["key"] == "hcsc.co/application_id":
                         APP_ID_EXTERNAL_LABEL = label["value"]
                         app_id_exists = True
 
