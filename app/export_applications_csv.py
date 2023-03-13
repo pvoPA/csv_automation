@@ -1,8 +1,22 @@
 from helpers import *
 
 
-def main(data="", context=""):
-    token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+def ETL_applications_csv(PRISMA_TOKEN: str) -> list[dict]:
+    """
+    Gets container data from Prisma and transforms to create application relevant data.
+
+    Parameters:
+    PRISMA_TOKEN (str): PRISMA token for API access.
+
+    Returns:
+    list[dict]: list of dictionaries containing application data
+
+    """
+    APPLICATION_ID_KEY = os.getenv("APP_ID_KEY")
+    OWNER_ID_KEY = os.getenv("OWNER_ID_KEY")
+    COLLECTIONS_FILTER = os.getenv("COLLECTIONS_FILTER")
+    ############################################################################################################################################
+    # Get containers from Prisma
 
     end_of_page = False
     offset = 0
@@ -11,7 +25,9 @@ def main(data="", context=""):
     containers_data = list()
 
     while not end_of_page:
-        containers_response = get_containers(token, offset=offset, limit=LIMIT)
+        containers_response = get_containers(
+            PRISMA_TOKEN, offset=offset, limit=LIMIT, collections=COLLECTIONS_FILTER
+        )
 
         if containers_response:
             containers_data += [container for container in containers_response]
@@ -19,6 +35,9 @@ def main(data="", context=""):
             end_of_page = True
 
         offset += LIMIT
+
+    ############################################################################################################################################
+    # Transform and grab fields of interest
 
     csv_rows = list()
 
@@ -34,13 +53,13 @@ def main(data="", context=""):
 
             if "externalLabels" in container["info"]:
                 for label in container["info"]["externalLabels"]:
-                    if label["key"] == "app_id":
+                    if label["key"] == APPLICATION_ID_KEY:
                         APP_ID_EXTERNAL_LABEL = label["value"]
                         app_id_exists = True
                         break
 
             if not app_id_exists:
-                APP_ID_EXTERNAL_LABEL = os.getenv("DEFAULT_APP_ID")
+                APP_ID_EXTERNAL_LABEL = os.getenv("DEFAULT_APP")
 
             if APP_ID_EXTERNAL_LABEL in associated_container_names_by_app:
                 associated_container_names_by_app[APP_ID_EXTERNAL_LABEL].append(
@@ -70,8 +89,12 @@ def main(data="", context=""):
             # Build out the App ID
             if "cluster" in container["info"]:
                 CLUSTER = container["info"]["cluster"]
+            else:
+                CLUSTER = ""
             if "namespace" in container["info"]:
                 NAMESPACE = container["info"]["namespace"]
+            else:
+                NAMESPACE = ""
 
             app_id_exists = False
 
@@ -79,12 +102,12 @@ def main(data="", context=""):
 
             if "externalLabels" in container["info"]:
                 for label in container["info"]["externalLabels"]:
-                    if label["key"] == "app_id":
+                    if label["key"] == APPLICATION_ID_KEY:
                         APP_ID_EXTERNAL_LABEL = label["value"]
                         app_id_exists = True
 
                     # Get the Owner while parsing external labels
-                    if label["key"] == "ays_support_group":
+                    if label["key"] == OWNER_ID_KEY:
                         OWNER = label["value"]
                         owner_exists = True
 
@@ -92,12 +115,15 @@ def main(data="", context=""):
                         break
 
             if not app_id_exists:
-                APP_ID_EXTERNAL_LABEL = os.getenv("DEFAULT_APP_ID")
+                APP_ID_EXTERNAL_LABEL = os.getenv("DEFAULT_APP")
 
             if not owner_exists:
                 OWNER = ""
 
             APP_ID = f"{CLUSTER}_{NAMESPACE}_{APP_ID_EXTERNAL_LABEL}"
+
+            ############################################################################################################################################
+            # Create rows for CSV
 
             for associated_container in associated_container_names_by_app[
                 APP_ID_EXTERNAL_LABEL
@@ -116,9 +142,11 @@ def main(data="", context=""):
 
                 csv_rows.append(row_dict)
 
-    if csv_rows:
-        write_data_to_csv("prisma_applications.csv", csv_rows)
+    return csv_rows
 
 
-if __name__ == "__main__":
-    main()
+PRISMA_TOKEN = generate_prisma_token(prisma_access_key, prisma_secret_key)
+
+logger.info(f" Creating applications CSV...")
+application_rows = ETL_applications_csv(PRISMA_TOKEN)
+write_data_to_csv("prisma_applications.csv", application_rows)

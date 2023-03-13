@@ -89,7 +89,7 @@ def get_images(token: str, collection="", cluster="", limit="", offset="") -> li
     return data
 
 
-def get_containers(token: str, offset="", limit="") -> list:
+def get_containers(token: str, offset="", limit="", collections="") -> list:
     """
     Retrieves a list of all containers.
 
@@ -104,6 +104,8 @@ def get_containers(token: str, offset="", limit="") -> list:
     """
     endpoint = f"https://{CWPP_api_endpoint}/api/v1/containers?"
 
+    if collections:
+        endpoint += f"&collections={collections}"
     if limit:
         endpoint += f"&limit={limit}"
     if offset:

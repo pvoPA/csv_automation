@@ -1,9 +1,20 @@
 from helpers import *
 
 
-def main(data="", context=""):
-    token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+def ETL_containers_csv(PRISMA_TOKEN: str):
+    """
+    Gets container data from Prisma and transforms for CSV friendly data.
 
+    Parameters:
+    PRISMA_TOKEN (str): PRISMA token for API access.
+
+    Returns:
+    list[dict]: list of dictionaries containing container data
+
+    """
+    COLLECTIONS_FILTER = os.getenv("COLLECTIONS_FILTER")
+    ############################################################################################################################################
+    # Grab containers data from Prisma
     end_of_page = False
     offset = 0
     LIMIT = 50
@@ -11,7 +22,9 @@ def main(data="", context=""):
     containers_data = list()
 
     while not end_of_page:
-        containers_response = get_containers(token, offset=offset, limit=LIMIT)
+        containers_response = get_containers(
+            PRISMA_TOKEN, offset=offset, limit=LIMIT, collections=COLLECTIONS_FILTER
+        )
 
         if containers_response:
             containers_data += [container for container in containers_response]
@@ -21,6 +34,9 @@ def main(data="", context=""):
         offset += LIMIT
 
     csv_rows = list()
+
+    ############################################################################################################################################
+    # Transform and grab fields of interest
 
     if containers_data:
         for container in containers_data:
@@ -48,9 +64,11 @@ def main(data="", context=""):
 
                 csv_rows.append(row_dict)
 
-    if csv_rows:
-        write_data_to_csv("prisma_containers.csv", csv_rows)
+    return csv_rows
 
 
-if __name__ == "__main__":
-    main()
+PRISMA_TOKEN = generate_prisma_token(prisma_access_key, prisma_secret_key)
+
+logger.info(f" Creating containers CSV...")
+container_rows = ETL_containers_csv(PRISMA_TOKEN)
+write_data_to_csv("prisma_containers.csv", container_rows)

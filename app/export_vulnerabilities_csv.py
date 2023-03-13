@@ -1,9 +1,18 @@
 from helpers import *
 
 
-def main(data="", context=""):
-    token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+def ETL_vulnerabilities_csv(PRISMA_TOKEN: str):
+    """
+    Gets container and image data from Prisma and transforms to create image vulnerability relevant data.
 
+    Parameters:
+    PRISMA_TOKEN (str): PRISMA token for API access.
+
+    Returns:
+    list[dict]: list of dictionaries containing image vulnerability data
+
+    """
+    COLLECTIONS_FILTER = os.getenv("COLLECTIONS_FILTER")
     ############################################################################################################################################
     # Get collection IDs for image vulnerability correlation
 
@@ -14,7 +23,9 @@ def main(data="", context=""):
     containers_data = list()
 
     while not end_of_page:
-        containers_response = get_containers(token, offset=offset, limit=LIMIT)
+        containers_response = get_containers(
+            PRISMA_TOKEN, offset=offset, limit=LIMIT, collections=COLLECTIONS_FILTER
+        )
 
         if containers_response:
             containers_data += [container for container in containers_response]
@@ -33,7 +44,7 @@ def main(data="", context=""):
     images_data = list()
 
     while not end_of_page:
-        images_response = get_images(token, offset=offset, limit=LIMIT)
+        images_response = get_images(PRISMA_TOKEN, offset=offset, limit=LIMIT)
 
         if images_response:
             images_data += [image for image in images_response]
@@ -43,7 +54,7 @@ def main(data="", context=""):
         offset += LIMIT
 
     ############################################################################################################################################
-    # Transform and create the CSVs
+    # Transform and grab fields of interest
 
     csv_rows = list()
 
@@ -127,6 +138,9 @@ def main(data="", context=""):
 
     incremental_id = 0
 
+    ############################################################################################################################################
+    # Create the rows for CSV creation
+
     if containers_data:
         for container in containers_data:
             # Constant fields
@@ -152,9 +166,11 @@ def main(data="", context=""):
 
                     incremental_id += 1
 
-    if csv_rows:
-        write_data_to_csv("prisma_vulnerabilities.csv", csv_rows)
+    return csv_rows
 
 
-if __name__ == "__main__":
-    main()
+PRISMA_TOKEN = generate_prisma_token(prisma_access_key, prisma_secret_key)
+
+logger.info(f" Creating vulnerabilities CSV...")
+vulnerability_rows = ETL_vulnerabilities_csv(PRISMA_TOKEN)
+write_data_to_csv("prisma_vulnerabilities.csv", vulnerability_rows)
