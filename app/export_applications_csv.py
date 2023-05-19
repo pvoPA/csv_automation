@@ -1,21 +1,33 @@
-from helpers import *
+import os
+import json
+from helpers import logger
+from helpers import generate_prisma_token
+from helpers import prisma_get_containers_scan_results
+from helpers import write_data_to_csv
 
 
-def ETL_applications_csv(PRISMA_TOKEN: str) -> list[dict]:
+def etl_applications_csv() -> None:
     """
     Gets container data from Prisma and transforms to create application relevant data.
 
     Parameters:
-    PRISMA_TOKEN (str): PRISMA token for API access.
+        None
 
     Returns:
-    list[dict]: list of dictionaries containing application data
+        None
 
     """
+    applications_csv_name = os.getenv("APPLICATIONS_CSV_NAME")
+    COLLECTIONS_FILTER = ", ".join(json.loads(os.getenv("COLLECTIONS_FILTER")))
     APPLICATION_ID_KEY = os.getenv("APP_ID_KEY")
     OWNER_ID_KEY = os.getenv("OWNER_ID_KEY")
-    COLLECTIONS_FILTER = os.getenv("COLLECTIONS_FILTER")
-    ############################################################################################################################################
+    prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
+    prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
+
+    file_path = f"CSVs/{applications_csv_name}"
+    prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+
+    ###########################################################################
     # Get containers from Prisma
 
     end_of_page = False
@@ -25,18 +37,25 @@ def ETL_applications_csv(PRISMA_TOKEN: str) -> list[dict]:
     containers_data = list()
 
     while not end_of_page:
-        containers_response = get_containers(
-            PRISMA_TOKEN, offset=offset, limit=LIMIT, collections=COLLECTIONS_FILTER
+        containers_response, status_code = prisma_get_containers_scan_results(
+            prisma_token, offset=offset, limit=LIMIT, collection=COLLECTIONS_FILTER
         )
 
-        if containers_response:
-            containers_data += [container for container in containers_response]
+        if status_code == 200:
+            if containers_response:
+                containers_data += [container for container in containers_response]
+            else:
+                end_of_page = True
+
+            offset += LIMIT
+        elif status_code == 401:
+            logger.error("Prisma token timed out, generating a new one and continuing.")
+
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
         else:
-            end_of_page = True
+            logger.error("API returned %s.", status_code)
 
-        offset += LIMIT
-
-    ############################################################################################################################################
+    ###########################################################################
     # Transform and grab fields of interest
 
     csv_rows = list()
@@ -84,7 +103,9 @@ def ETL_applications_csv(PRISMA_TOKEN: str) -> list[dict]:
             # Constant fields
             CONTAINER_ID = container["info"]["id"]
             # Key = CSV Column Name, Value = JSON field
-            # App id(cluster + namespace + app_id (external label added to the resource, if this app_id does not exist then the default is APP00046878), associated container ids, owner(external label ays_support_group)
+            # App id(cluster + namespace + app_id (external label added to the resource,
+            #   if this app_id does not exist then the default is APP00046878),
+            #   associated container ids, owner(external label ays_support_group)
 
             # Build out the App ID
             if "cluster" in container["info"]:
@@ -122,7 +143,7 @@ def ETL_applications_csv(PRISMA_TOKEN: str) -> list[dict]:
 
             APP_ID = f"{CLUSTER}_{NAMESPACE}_{APP_ID_EXTERNAL_LABEL}"
 
-            ############################################################################################################################################
+            ###################################################################
             # Create rows for CSV
 
             for associated_container in associated_container_names_by_app[
@@ -142,11 +163,12 @@ def ETL_applications_csv(PRISMA_TOKEN: str) -> list[dict]:
 
                 csv_rows.append(row_dict)
 
-    return csv_rows
+    field_names = [key for key in csv_rows[0].keys()]
+
+    write_data_to_csv(file_path, csv_rows, field_names, new_file=True)
 
 
-PRISMA_TOKEN = generate_prisma_token(prisma_access_key, prisma_secret_key)
+if __name__ == "__main__":
+    logger.info("Creating applications CSV...")
 
-logger.info(f" Creating applications CSV...")
-application_rows = ETL_applications_csv(PRISMA_TOKEN)
-write_data_to_csv("prisma_applications.csv", application_rows)
+    etl_applications_csv()

@@ -1,20 +1,33 @@
-from helpers import *
+import os
+import json
+from helpers import logger
+from helpers import generate_prisma_token
+from helpers import prisma_get_containers_scan_results
+from helpers import write_data_to_csv
 
 
-def ETL_containers_csv(PRISMA_TOKEN: str):
+def etl_containers_csv():
     """
     Gets container data from Prisma and transforms for CSV friendly data.
 
     Parameters:
-    PRISMA_TOKEN (str): PRISMA token for API access.
+        None
 
     Returns:
-    list[dict]: list of dictionaries containing container data
+        None
 
     """
-    COLLECTIONS_FILTER = os.getenv("COLLECTIONS_FILTER")
-    ############################################################################################################################################
+    containers_csv_name = os.getenv("CONTAINERS_CSV_NAME")
+    COLLECTIONS_FILTER = ", ".join(json.loads(os.getenv("COLLECTIONS_FILTER")))
+    prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
+    prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
+
+    file_path = f"CSVs/{containers_csv_name}"
+    prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+
+    ##########################################################################
     # Grab containers data from Prisma
+
     end_of_page = False
     offset = 0
     LIMIT = 50
@@ -22,20 +35,27 @@ def ETL_containers_csv(PRISMA_TOKEN: str):
     containers_data = list()
 
     while not end_of_page:
-        containers_response = get_containers(
-            PRISMA_TOKEN, offset=offset, limit=LIMIT, collections=COLLECTIONS_FILTER
+        containers_response, status_code = prisma_get_containers_scan_results(
+            prisma_token, offset=offset, limit=LIMIT, collection=COLLECTIONS_FILTER
         )
 
-        if containers_response:
-            containers_data += [container for container in containers_response]
-        else:
-            end_of_page = True
+        if status_code == 200:
+            if containers_response:
+                containers_data += [container for container in containers_response]
+            else:
+                end_of_page = True
 
-        offset += LIMIT
+            offset += LIMIT
+        elif status_code == 401:
+            logger.error("Prisma token timed out, generating a new one and continuing.")
+
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+        else:
+            logger.error("API returned %s.", status_code)
 
     csv_rows = list()
 
-    ############################################################################################################################################
+    ###########################################################################
     # Transform and grab fields of interest
 
     if containers_data:
@@ -64,11 +84,12 @@ def ETL_containers_csv(PRISMA_TOKEN: str):
 
                 csv_rows.append(row_dict)
 
-    return csv_rows
+    field_names = [key for key in csv_rows[0].keys()]
+
+    write_data_to_csv(file_path, csv_rows, field_names, new_file=True)
 
 
-PRISMA_TOKEN = generate_prisma_token(prisma_access_key, prisma_secret_key)
+if __name__ == "__main__":
+    logger.info("Creating containers CSV...")
 
-logger.info(f" Creating containers CSV...")
-container_rows = ETL_containers_csv(PRISMA_TOKEN)
-write_data_to_csv("prisma_containers.csv", container_rows)
+    etl_containers_csv()
