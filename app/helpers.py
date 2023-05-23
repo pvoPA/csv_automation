@@ -92,7 +92,9 @@ def prisma_get_tanzu_blob_store_scan_results(
 
     endpoint = f"https://{cwp_endpoint}/api/v1/tas-droplets?offset={str(offset)}&limit={str(limit)}"
 
-    logger.info("Getting host scan results from Prisma using endpoint: %s", endpoint)
+    logger.info(
+        "Getting tanzu blob store scan results from Prisma using endpoint: %s", endpoint
+    )
 
     headers = {
         "accept": "application/json; charset=UTF-8",
@@ -253,7 +255,7 @@ def prisma_get_containers_scan_results(
     if collection:
         endpoint += f"&collections={collection}"
 
-    logger.info("Getting images from Prisma using endpoint: %s", endpoint)
+    logger.info("Getting containers from Prisma using endpoint: %s", endpoint)
 
     headers = {
         "accept": "application/json; charset=UTF-8",
