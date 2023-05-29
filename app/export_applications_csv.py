@@ -61,44 +61,6 @@ def etl_applications_csv() -> None:
     csv_rows = list()
 
     if containers_data:
-        # Build associated containers
-        associated_container_names_by_app = dict()
-
-        for container in containers_data:
-            CONTAINER_NAME = container["info"]["name"]
-            CONTAINER_ID = container["info"]["id"]
-
-            app_id_exists = False
-
-            if "externalLabels" in container["info"]:
-                for label in container["info"]["externalLabels"]:
-                    if label["key"] == APPLICATION_ID_KEY:
-                        APP_ID_EXTERNAL_LABEL = label["value"]
-                        app_id_exists = True
-                        break
-
-            if not app_id_exists:
-                APP_ID_EXTERNAL_LABEL = os.getenv("DEFAULT_APP")
-
-            if APP_ID_EXTERNAL_LABEL in associated_container_names_by_app:
-                associated_container_names_by_app[APP_ID_EXTERNAL_LABEL].append(
-                    {
-                        "associated_container_name": CONTAINER_NAME,
-                        "associated_container_ID": CONTAINER_ID,
-                    }
-                )
-            else:
-                associated_container_names_by_app.update(
-                    {
-                        APP_ID_EXTERNAL_LABEL: [
-                            {
-                                "associated_container_name": CONTAINER_NAME,
-                                "associated_container_ID": CONTAINER_ID,
-                            }
-                        ]
-                    }
-                )
-
         for container in containers_data:
             # Constant fields
             CONTAINER_ID = container["info"]["id"]
@@ -146,22 +108,13 @@ def etl_applications_csv() -> None:
             ###################################################################
             # Create rows for CSV
 
-            for associated_container in associated_container_names_by_app[
-                APP_ID_EXTERNAL_LABEL
-            ]:
-                row_dict = {
-                    "Container_ID": CONTAINER_ID,
-                    "App_ID": APP_ID,
-                    "Associated_Container_Name": associated_container[
-                        "associated_container_name"
-                    ],
-                    "Associated_Container_ID": associated_container[
-                        "associated_container_ID"
-                    ],
-                    "Owner": OWNER,
-                }
+            row_dict = {
+                "Container_ID": CONTAINER_ID,
+                "App_ID": APP_ID,
+                "Owner": OWNER,
+            }
 
-                csv_rows.append(row_dict)
+            csv_rows.append(row_dict)
 
     field_names = [key for key in csv_rows[0].keys()]
 
