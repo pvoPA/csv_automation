@@ -31,6 +31,8 @@ def etl_applications_csv() -> None:
     file_path = f"CSVs/{applications_csv_name}_{todays_date}.csv"
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
+    csv_fields = ["Container_ID", "App_ID", "Owner"]
+
     ###########################################################################
     # Get containers from Prisma
 
@@ -53,9 +55,11 @@ def etl_applications_csv() -> None:
 
             offset += LIMIT
         elif status_code == 401:
-            logger.error("Prisma token timed out, generating a new one and continuing.")
+            logger.error(
+                "Prisma token timed out, generating a new one and continuing.")
 
-            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+            prisma_token = generate_prisma_token(
+                prisma_access_key, prisma_secret_key)
         else:
             logger.error("API returned %s.", status_code)
 
