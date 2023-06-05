@@ -1,12 +1,25 @@
 import os
 import json
+import datetime as dt
 from helpers import logger
 from helpers import generate_prisma_token
 from helpers import prisma_get_containers_scan_results
 from helpers import write_data_to_csv
 
 
-def etl_containers_csv():
+csv_fields = [
+    "Namespace",
+    "Container_Name",
+    "Host_Name",
+    "Collection",
+    "Container_ID",
+    "Account_ID",
+    "Cluster",
+    "Image_ID",
+]
+
+
+def etl_containers_csv(collections_filter, containers_csv_name):
     """
     Gets container data from Prisma and transforms for CSV friendly data.
 
@@ -17,12 +30,11 @@ def etl_containers_csv():
         None
 
     """
-    containers_csv_name = os.getenv("CONTAINERS_CSV_NAME")
-    COLLECTIONS_FILTER = ", ".join(json.loads(os.getenv("COLLECTIONS_FILTER")))
+    todays_date = str(dt.datetime.today()).split()[0]
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
 
-    file_path = f"CSVs/{containers_csv_name}"
+    file_path = f"CSVs/{containers_csv_name}_{todays_date}.csv"
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
     ##########################################################################
@@ -36,7 +48,7 @@ def etl_containers_csv():
 
     while not end_of_page:
         containers_response, status_code = prisma_get_containers_scan_results(
-            prisma_token, offset=offset, limit=LIMIT, collection=COLLECTIONS_FILTER
+            prisma_token, offset=offset, limit=LIMIT, collection=collections_filter
         )
 
         if status_code == 200:
@@ -67,6 +79,7 @@ def etl_containers_csv():
                     "Container_ID": container["info"]["id"],
                     "Container_Name": container["info"]["name"],
                     "Image_ID": container["info"]["imageID"],
+                    "Host_Name": container["hostname"],
                     "Account_ID": container["info"]["cloudMetadata"]["accountID"],
                     "Collection": collection,
                 }
@@ -84,12 +97,22 @@ def etl_containers_csv():
 
                 csv_rows.append(row_dict)
 
-    field_names = [key for key in csv_rows[0].keys()]
-
-    write_data_to_csv(file_path, csv_rows, field_names, new_file=True)
+    write_data_to_csv(file_path, csv_rows, csv_fields, new_file=True)
 
 
 if __name__ == "__main__":
     logger.info("Creating containers CSV...")
+    OPENSHIFT_COLLECTIONS_FILTER = ", ".join(
+        json.loads(os.getenv("OPENSHIFT_COLLECTIONS_FILTER"))
+    )
+    OPENSHIFT_CONTAINERS_CSV_NAME = os.getenv("OPENSHIFT_CONTAINERS_CSV_NAME")
+    HOST_COLLECTIONS_FILTER = ", ".join(
+        json.loads(os.getenv("HOST_COLLECTIONS_FILTER"))
+    )
+    HOST_CONTAINERS_CSV_NAME = os.getenv("HOST_CONTAINERS_CSV_NAME")
+    TAS_COLLECTIONS_FILTER = ", ".join(json.loads(os.getenv("TAS_COLLECTIONS_FILTER")))
+    TAS_CONTAINERS_CSV_NAME = os.getenv("TAS_CONTAINERS_CSV_NAME")
 
-    etl_containers_csv()
+    etl_containers_csv(OPENSHIFT_COLLECTIONS_FILTER, OPENSHIFT_CONTAINERS_CSV_NAME)
+    etl_containers_csv(HOST_COLLECTIONS_FILTER, HOST_CONTAINERS_CSV_NAME)
+    etl_containers_csv(TAS_COLLECTIONS_FILTER, TAS_CONTAINERS_CSV_NAME)

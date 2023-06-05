@@ -1,5 +1,6 @@
 import os
 import json
+import datetime as dt
 from helpers import logger
 from helpers import generate_prisma_token
 from helpers import prisma_get_containers_scan_results
@@ -17,14 +18,17 @@ def etl_applications_csv() -> None:
         None
 
     """
+    todays_date = str(dt.datetime.today()).split()[0]
     applications_csv_name = os.getenv("APPLICATIONS_CSV_NAME")
-    COLLECTIONS_FILTER = ", ".join(json.loads(os.getenv("COLLECTIONS_FILTER")))
+    COLLECTIONS_FILTER = ", ".join(
+        json.loads(os.getenv("OPENSHIFT_COLLECTIONS_FILTER"))
+    )
     APPLICATION_ID_KEY = os.getenv("APP_ID_KEY")
     OWNER_ID_KEY = os.getenv("OWNER_ID_KEY")
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
 
-    file_path = f"CSVs/{applications_csv_name}"
+    file_path = f"CSVs/{applications_csv_name}_{todays_date}.csv"
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
     ###########################################################################
