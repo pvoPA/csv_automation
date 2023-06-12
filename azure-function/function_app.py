@@ -35,28 +35,10 @@ from helpers import prisma_get_tanzu_blob_store_scan_results
 
 function_app = func.FunctionApp()
 
-applications_csv_cron_schedule = os.getenv("APPLICATIONS_CSV_CRON_SCHEDULE")
-containers_csv_cron_schedule = os.getenv("CONTAINERS_CSV_CRON_SCHEDULE")
-host_vulnerability_csv_cron_schedule = os.getenv(
-    "HOST_VULNERABILITY_CSV_CRON_SCHEDULE")
-tas_vulnerability_csv_cron_schedule = os.getenv(
-    "TAS_VULNERABILITY_CSV_CRON_SCHEDULE")
-image_vulnerability_csv_cron_schedule = os.getenv(
-    "IMAGE_VULNERABILITY_CSV_CRON_SCHEDULE"
-)
-registry_image_vulnerability_csv_cron_schedule = os.getenv(
-    "REGISTRY_IMAGE_VULNERABILITY_CSV_CRON_SCHEDULE"
-)
-tanzu_blobstore_vulnerability_csv_cron_schedule = os.getenv(
-    "TANZU_BLOBSTORE_VULNERABILITY_CSV_CRON_SCHEDULE"
-)
-
 
 @function_app.function_name(name="export_openshift_applications_csv")
-@function_app.schedule(arg_name="timer",
-                       schedule=applications_csv_cron_schedule, run_on_startup=False, use_monitor=True
-                       )
-def export_openshift_applications_csv(timer: func.TimerRequest):
+@app.route(route="export_openshift_applications_csv")
+def export_openshift_applications_csv(req: func.HttpRequest):
     """
     Gets container data from Prisma and transforms to create application relevant data.
 
@@ -80,7 +62,7 @@ def export_openshift_applications_csv(timer: func.TimerRequest):
     file_path = f"CSVs/{applications_csv_name}_{todays_date}.csv"
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
-    csv_fields = ["Container_ID", "App_ID", "Owner"]
+    csv_fields = ["Incremental_ID", "Container_ID", "App_ID", "Owner"]
 
     ###########################################################################
     # Get containers from Prisma
@@ -104,11 +86,9 @@ def export_openshift_applications_csv(timer: func.TimerRequest):
 
             offset += LIMIT
         elif status_code == 401:
-            logger.error(
-                "Prisma token timed out, generating a new one and continuing.")
+            logger.error("Prisma token timed out, generating a new one and continuing.")
 
-            prisma_token = generate_prisma_token(
-                prisma_access_key, prisma_secret_key)
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
         else:
             logger.error("API returned %s.", status_code)
 
@@ -116,6 +96,7 @@ def export_openshift_applications_csv(timer: func.TimerRequest):
     # Transform and grab fields of interest
 
     csv_rows = list()
+    incremental_id = 0
 
     if containers_data:
         for container in containers_data:
@@ -166,6 +147,7 @@ def export_openshift_applications_csv(timer: func.TimerRequest):
             # Create rows for CSV
 
             row_dict = {
+                "Incremental_ID": incremental_id,
                 "Container_ID": CONTAINER_ID,
                 "App_ID": APP_ID,
                 "Owner": OWNER,
@@ -173,14 +155,16 @@ def export_openshift_applications_csv(timer: func.TimerRequest):
 
             csv_rows.append(row_dict)
 
+            incremental_id += 1
+
     write_data_to_csv(file_path, csv_rows, csv_fields, new_file=True)
+
+    return func.HttpResponse("This HTTP triggered function executed successfully.")
 
 
 @function_app.function_name(name="export_openshift_containers_csv")
-@function_app.schedule(arg_name="timer",
-                       schedule=applications_csv_cron_schedule, run_on_startup=False, use_monitor=True
-                       )
-def export_openshift_containers_csv(timer: func.TimerRequest):
+@app.route(route="export_openshift_containers_csv")
+def export_openshift_containers_csv(req: func.HttpRequest):
     """
     Gets container data from Prisma and transforms for CSV friendly data.
 
@@ -193,8 +177,10 @@ def export_openshift_containers_csv(timer: func.TimerRequest):
     """
     containers_csv_name = os.getenv("OPENSHIFT_CONTAINERS_CSV_NAME")
     collections_filter = ", ".join(
-        json.loads(os.getenv("OPENSHIFT_COLLECTIONS_FILTER")))
+        json.loads(os.getenv("OPENSHIFT_COLLECTIONS_FILTER"))
+    )
     csv_fields = [
+        "Incremental_ID",
         "Namespace",
         "Container_Name",
         "Host_Name",
@@ -233,15 +219,14 @@ def export_openshift_containers_csv(timer: func.TimerRequest):
 
             offset += LIMIT
         elif status_code == 401:
-            logger.error(
-                "Prisma token timed out, generating a new one and continuing.")
+            logger.error("Prisma token timed out, generating a new one and continuing.")
 
-            prisma_token = generate_prisma_token(
-                prisma_access_key, prisma_secret_key)
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
         else:
             logger.error("API returned %s.", status_code)
 
     csv_rows = list()
+    incremental_id = 0
 
     ###########################################################################
     # Transform and grab fields of interest
@@ -260,10 +245,11 @@ def export_openshift_containers_csv(timer: func.TimerRequest):
                     "Collection": collection,
                 }
 
+                row_dict.update({"Incremental_ID": incremental_id})
+
                 # Variable fields
                 if "namespace" in container["info"]:
-                    row_dict.update(
-                        {"Namespace": container["info"]["namespace"]})
+                    row_dict.update({"Namespace": container["info"]["namespace"]})
                 else:
                     row_dict.update({"Namespace": ""})
 
@@ -274,16 +260,16 @@ def export_openshift_containers_csv(timer: func.TimerRequest):
 
                 csv_rows.append(row_dict)
 
+                incremental_id += 1
+
     write_data_to_csv(file_path, csv_rows, csv_fields, new_file=True)
+
+    return func.HttpResponse("This HTTP triggered function executed successfully.")
 
 
 @function_app.function_name(name="export_openshift_image_vulnerability_csv")
-@function_app.schedule(arg_name="timer",
-                       schedule=image_vulnerability_csv_cron_schedule,
-                       run_on_startup=False,
-                       use_monitor=True,
-                       )
-def export_openshift_image_vulnerability_csv(timer: func.TimerRequest):
+@app.route(route="export_openshift_image_vulnerability_csv")
+def export_openshift_image_vulnerability_csv(req: func.HttpRequest):
     """
     Gets container and image data from Prisma and transforms to
         create image vulnerability relevant data.
@@ -302,19 +288,18 @@ def export_openshift_image_vulnerability_csv(timer: func.TimerRequest):
     )
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
-
-    csv_fields = ["Incremental_ID",
-                  "Container_ID",
-                  "Image_ID",
-                  "CVE",
-                  "CVSS_Score",
-                  "Severity",
-                  "Fix_Status",
-                  "Package_Name",
-                  "Package_Path",
-                  "Time_Discovered",
-                  ]
-
+    csv_fields = [
+        "Incremental_ID",
+        "Container_ID",
+        "Image_ID",
+        "CVE",
+        "CVSS_Score",
+        "Severity",
+        "Fix_Status",
+        "Package_Name",
+        "Package_Path",
+        "Time_Discovered",
+    ]
     file_path = f"CSVs/{IMAGE_VULNERABILITY_CSV_NAME}_{todays_date}.csv"
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
@@ -339,11 +324,9 @@ def export_openshift_image_vulnerability_csv(timer: func.TimerRequest):
 
             offset += LIMIT
         elif status_code == 401:
-            logger.error(
-                "Prisma token timed out, generating a new one and continuing.")
+            logger.error("Prisma token timed out, generating a new one and continuing.")
 
-            prisma_token = generate_prisma_token(
-                prisma_access_key, prisma_secret_key)
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
         else:
             logger.error("API returned %s.", status_code)
 
@@ -369,11 +352,9 @@ def export_openshift_image_vulnerability_csv(timer: func.TimerRequest):
 
             offset += LIMIT
         elif status_code == 401:
-            logger.error(
-                "Prisma token timed out, generating a new one and continuing.")
+            logger.error("Prisma token timed out, generating a new one and continuing.")
 
-            prisma_token = generate_prisma_token(
-                prisma_access_key, prisma_secret_key)
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
         else:
             logger.error("API returned %s.", status_code)
 
@@ -492,14 +473,114 @@ def export_openshift_image_vulnerability_csv(timer: func.TimerRequest):
 
     write_data_to_csv(file_path, csv_rows, csv_fields, new_file=True)
 
+    return func.HttpResponse("This HTTP triggered function executed successfully.")
 
-@function_app.function_name(name="export_host_containers_csv")
-@function_app.schedule(arg_name="timer",
-                       schedule=applications_csv_cron_schedule, run_on_startup=False, use_monitor=True
-                       )
-def export_host_containers_csv(timer: func.TimerRequest):
+
+# @function_app.function_name(name="export_host_containers_csv")
+# @function_app.schedule(
+#     arg_name="timer",
+#     schedule=openshift_applications_csv_cron_schedule,
+#     run_on_startup=False,
+#     use_monitor=True,
+# )
+# def export_host_containers_csv(req: func.HttpRequest):
+#     """
+#     Gets container data from Prisma and transforms for CSV friendly data.
+
+#     Parameters:
+#         None
+
+#     Returns:
+#         None
+
+#     """
+#     containers_csv_name = os.getenv("HOST_CONTAINERS_CSV_NAME")
+#     collections_filter = ", ".join(json.loads(os.getenv("HOST_COLLECTIONS_FILTER")))
+#     csv_fields = [
+#         "Namespace",
+#         "Container_Name",
+#         "Host_Name",
+#         "Collection",
+#         "Container_ID",
+#         "Account_ID",
+#         "Cluster",
+#         "Image_ID",
+#     ]
+#     todays_date = str(dt.datetime.today()).split()[0]
+#     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
+#     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
+
+#     file_path = f"CSVs/{containers_csv_name}_{todays_date}.csv"
+#     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+
+#     ##########################################################################
+#     # Grab containers data from Prisma
+
+#     end_of_page = False
+#     offset = 0
+#     LIMIT = 50
+
+#     containers_data = list()
+
+#     while not end_of_page:
+#         containers_response, status_code = prisma_get_containers_scan_results(
+#             prisma_token, offset=offset, limit=LIMIT, collection=collections_filter
+#         )
+
+#         if status_code == 200:
+#             if containers_response:
+#                 containers_data += [container for container in containers_response]
+#             else:
+#                 end_of_page = True
+
+#             offset += LIMIT
+#         elif status_code == 401:
+#             logger.error("Prisma token timed out, generating a new one and continuing.")
+
+#             prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+#         else:
+#             logger.error("API returned %s.", status_code)
+
+#     csv_rows = list()
+
+#     ###########################################################################
+#     # Transform and grab fields of interest
+
+#     if containers_data:
+#         for container in containers_data:
+#             # Constant fields
+#             # Key = CSV Column Name, Value = JSON field
+#             for collection in container["collections"]:
+#                 row_dict = {
+#                     "Container_ID": container["info"]["id"],
+#                     "Container_Name": container["info"]["name"],
+#                     "Image_ID": container["info"]["imageID"],
+#                     "Host_Name": container["hostname"],
+#                     "Account_ID": container["info"]["cloudMetadata"]["accountID"],
+#                     "Collection": collection,
+#                 }
+
+#                 # Variable fields
+#                 if "namespace" in container["info"]:
+#                     row_dict.update({"Namespace": container["info"]["namespace"]})
+#                 else:
+#                     row_dict.update({"Namespace": ""})
+
+#                 if "cluster" in container["info"]:
+#                     row_dict.update({"Cluster": container["info"]["cluster"]})
+#                 else:
+#                     row_dict.update({"Cluster": ""})
+
+#                 csv_rows.append(row_dict)
+
+#     write_data_to_csv(file_path, csv_rows, csv_fields, new_file=True)
+
+
+@function_app.function_name(name="export_host_applications_csv")
+@app.route(route="export_host_applications_csv")
+def export_host_applications_csv(req: func.HttpRequest):
     """
-    Gets container data from Prisma and transforms for CSV friendly data.
+    Gets host data from Prisma and clean up for exporting to applications CSV.
 
     Parameters:
         None
@@ -508,99 +589,163 @@ def export_host_containers_csv(timer: func.TimerRequest):
         None
 
     """
-    containers_csv_name = os.getenv("HOST_CONTAINERS_CSV_NAME")
-    collections_filter = ", ".join(
-        json.loads(os.getenv("HOST_COLLECTIONS_FILTER")))
-    csv_fields = [
-        "Namespace",
-        "Container_Name",
-        "Host_Name",
-        "Collection",
-        "Container_ID",
-        "Account_ID",
-        "Cluster",
-        "Image_ID",
-    ]
     todays_date = str(dt.datetime.today()).split()[0]
+    COLLECTIONS_FILTER = ", ".join(json.loads(os.getenv("HOST_COLLECTIONS_FILTER")))
+    host_application_csv_name = os.getenv("HOST_APPLICATION_CSV_NAME")
+    host_application_fields_of_interest = json.loads(
+        os.getenv("HOST_APPLICATION_FIELDS_OF_INTEREST")
+    )
+    file_path = f"CSVs/{host_application_csv_name}_{todays_date}.csv"
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
+    external_labels_to_include = json.loads(
+        os.getenv("HOST_EXTERNAL_LABELS_TO_INCLUDE")
+    )
+    host_application_fields = [
+        "Incremental_ID",
+        "repoTag",
+        "firewallProtection",
+        "history",
+        "creationTime",
+        "packageManager",
+        "complianceIssuesCount",
+        "collections",
+        "pushTime",
+        "scanBuildDate",
+        "osDistro",
+        "labels",
+        "scanVersion",
+        "hostDevices",
+        "err",
+        "packageCorrelationDone",
+        "scanID",
+        "firstScanTime",
+        "complianceDistribution",
+        "startupBinaries",
+        "vulnerabilityRiskScore",
+        "image",
+        "agentless",
+        "tags",
+        "appEmbedded",
+        "wildFireUsage",
+        "trustStatus",
+        "hosts",
+        "Secrets",
+        "vulnerabilitiesCount",
+        "type",
+        "riskFactors",
+        "osDistroRelease",
+        "applications",
+        "isARM64",
+        "distro",
+        "vulnerabilityDistribution",
+        "complianceRiskScore",
+        "allCompliance",
+        "binaries",
+        "instances",
+        "files",
+        "installedProducts",
+        "scanTime",
+        "complianceIssues",
+        "cloudMetadata",
+        "hostname",
+        "_id",
+        "packages",
+        "osDistroVersion",
+        "repoDigests",
+        "externalLabels",
+        "rhelRepos",
+        "clusters",
+        "k8sClusterAddr",
+        "stopped",
+        "ecsClusterName",
+    ]
 
-    file_path = f"CSVs/{containers_csv_name}_{todays_date}.csv"
+    for external_label in external_labels_to_include:
+        host_application_fields.append(external_label)
+
+    ###########################################################################
+    # Generate Prisma Token
+
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
-    ##########################################################################
-    # Grab containers data from Prisma
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+
+    try:
+        os.remove(file_path)
+    except FileNotFoundError:
+        pass
+
+    ###########################################################################
+    # Get hosts from Prisma
 
     end_of_page = False
+    new_file = True
     offset = 0
-    LIMIT = 50
-
-    containers_data = list()
+    incremental_id = 0
+    page_limit = 50
 
     while not end_of_page:
-        containers_response, status_code = prisma_get_containers_scan_results(
-            prisma_token, offset=offset, limit=LIMIT, collection=collections_filter
+        host_list = list()
+
+        host_response, status_code = prisma_get_host_scan_results(
+            prisma_token, offset=offset, limit=page_limit, collection=COLLECTIONS_FILTER
         )
 
         if status_code == 200:
-            if containers_response:
-                containers_data += [container for container in containers_response]
+            if host_response:
+                ###############################################################
+                # Flatten application list for each host
+                for host in host_response:
+                    external_labels = dict()
+                    if "externalLabels" in host:
+                        for external_label in host["externalLabels"]:
+                            if external_label["key"] in external_labels_to_include:
+                                external_labels.update(
+                                    {external_label["key"]: external_label["value"]}
+                                )
+                    host_dict = external_labels
+
+                    host_dict.update({"Incremental_ID": incremental_id})
+
+                    # Grab base host information
+                    host_dict.update(
+                        {
+                            key: value
+                            for key, value in host.items()
+                            if (key in host_application_fields_of_interest)
+                        }
+                    )
+
+                    host_list.append(host_dict)
+
+                    incremental_id += 1
+
+                ##############################################################
+                # Write to CSV
+                write_data_to_csv(
+                    file_path, host_list, host_application_fields, new_file
+                )
+                new_file = False
+
+                offset += page_limit
             else:
                 end_of_page = True
-
-            offset += LIMIT
+                break
         elif status_code == 401:
-            logger.error(
-                "Prisma token timed out, generating a new one and continuing.")
+            logger.error("Prisma token timed out, generating a new one and continuing.")
 
-            prisma_token = generate_prisma_token(
-                prisma_access_key, prisma_secret_key)
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
         else:
             logger.error("API returned %s.", status_code)
 
-    csv_rows = list()
-
-    ###########################################################################
-    # Transform and grab fields of interest
-
-    if containers_data:
-        for container in containers_data:
-            # Constant fields
-            # Key = CSV Column Name, Value = JSON field
-            for collection in container["collections"]:
-                row_dict = {
-                    "Container_ID": container["info"]["id"],
-                    "Container_Name": container["info"]["name"],
-                    "Image_ID": container["info"]["imageID"],
-                    "Host_Name": container["hostname"],
-                    "Account_ID": container["info"]["cloudMetadata"]["accountID"],
-                    "Collection": collection,
-                }
-
-                # Variable fields
-                if "namespace" in container["info"]:
-                    row_dict.update(
-                        {"Namespace": container["info"]["namespace"]})
-                else:
-                    row_dict.update({"Namespace": ""})
-
-                if "cluster" in container["info"]:
-                    row_dict.update({"Cluster": container["info"]["cluster"]})
-                else:
-                    row_dict.update({"Cluster": ""})
-
-                csv_rows.append(row_dict)
-
-    write_data_to_csv(file_path, csv_rows, csv_fields, new_file=True)
+    return func.HttpResponse("This HTTP triggered function executed successfully.")
 
 
 @function_app.function_name(name="export_host_vulnerability_csv")
-@function_app.schedule(arg_name="timer",
-                       schedule=host_vulnerability_csv_cron_schedule,
-                       run_on_startup=False,
-                       use_monitor=True,
-                       )
-def export_host_vulnerability_csv(timer: func.TimerRequest):
+@app.route(route="export_host_vulnerability_csv")
+def export_host_vulnerability_csv(req: func.HttpRequest):
     """
     Gets host vulnerability data from Prisma and cleans up for exporting to CSV.
 
@@ -612,8 +757,7 @@ def export_host_vulnerability_csv(timer: func.TimerRequest):
 
     """
     todays_date = str(dt.datetime.today()).split()[0]
-    COLLECTIONS_FILTER = ", ".join(json.loads(
-        os.getenv("HOST_COLLECTIONS_FILTER")))
+    COLLECTIONS_FILTER = ", ".join(json.loads(os.getenv("HOST_COLLECTIONS_FILTER")))
     host_vulnerability_csv_name = os.getenv("HOST_VULNERABILITY_CSV_NAME")
     host_vulnerability_fields_of_interest = json.loads(
         os.getenv("HOST_VULNERABILITY_FIELDS_OF_INTEREST")
@@ -621,10 +765,9 @@ def export_host_vulnerability_csv(timer: func.TimerRequest):
     file_path = f"CSVs/{host_vulnerability_csv_name}_{todays_date}.csv"
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
-    external_labels_to_include = json.loads(
-        os.getenv("HOST_EXTERNAL_LABELS_TO_INCLUDE")
-    )
     host_vulnerability_fields = [
+        "Incremental_ID",
+        "Resource_ID",
         "_id",
         "type",
         "hostname",
@@ -706,9 +849,6 @@ def export_host_vulnerability_csv(timer: func.TimerRequest):
         "Incremental_ID",
     ]
 
-    for external_label in external_labels_to_include:
-        host_vulnerability_fields.append(external_label)
-
     ###########################################################################
     # Generate Prisma Token
 
@@ -726,14 +866,16 @@ def export_host_vulnerability_csv(timer: func.TimerRequest):
     # Get hosts from Prisma
 
     end_of_page = False
-    # new_file = True
+    new_file = True
     offset = 0
+    incremental_id = 0
     page_limit = 50
-    host_vulnerability_dict = dict()
 
     while not end_of_page:
+        vulnerability_list = list()
+
         host_response, status_code = prisma_get_host_scan_results(
-            prisma_token, offset=offset, limit=page_limit
+            prisma_token, offset=offset, limit=page_limit, collection=COLLECTIONS_FILTER
         )
 
         if status_code == 200:
@@ -741,39 +883,17 @@ def export_host_vulnerability_csv(timer: func.TimerRequest):
                 ###############################################################
                 # Flatten vulnerability list for each host
                 for host in host_response:
-                    external_labels = dict()
-                    if "externalLabels" in host:
-                        for external_label in host["externalLabels"]:
-                            if external_label["key"] in external_labels_to_include:
-                                external_labels.update(
-                                    {external_label["key"]: external_label["value"]}
-                                )
                     if "vulnerabilities" in host:
                         if host["vulnerabilities"]:
                             for vuln in host["vulnerabilities"]:
-                                vulnerability_dict = external_labels
-
-                                # Grab base host information
-                                vulnerability_dict.update(
-                                    {
-                                        key: value
-                                        for key, value in host.items()
-                                        if (
-                                            key in host_vulnerability_fields_of_interest
-                                        )
-                                    }
-                                )
-
                                 # Add the individual vulnerability information
-                                vulnerability_dict.update(
-                                    {
-                                        key: value
-                                        for key, value in vuln.items()
-                                        if (
-                                            key in host_vulnerability_fields_of_interest
-                                        )
-                                    }
-                                )
+                                vulnerability_dict = {
+                                    key: value
+                                    for key, value in vuln.items()
+                                    if (key in host_vulnerability_fields_of_interest)
+                                }
+
+                                vulnerability_dict.update({"Resource_ID": host["_id"]})
 
                                 # Get the package info and install path
                                 PACKAGE_NAME = vuln["packageName"]
@@ -829,459 +949,18 @@ def export_host_vulnerability_csv(timer: func.TimerRequest):
                                 if package_found:
                                     vulnerability_dict["Package_Path"] = PACKAGE_PATH
 
-                                if host["_id"] in host_vulnerability_dict:
-                                    host_vulnerability_dict[host["_id"]].append(
-                                        vulnerability_dict
-                                    )
-                                else:
-                                    host_vulnerability_dict.update(
-                                        {host["_id"]: [vulnerability_dict]}
-                                    )
-
-                ###############################################################
-                # # Write to CSV
-                # write_data_to_csv(
-                #     file_path, vulnerability_list, host_vulnerability_fields, new_file
-                # )
-                # new_file = False
-
-                offset += page_limit
-            else:
-                end_of_page = True
-                break
-        elif status_code == 401:
-            logger.error(
-                "Prisma token timed out, generating a new one and continuing.")
-
-            prisma_token = generate_prisma_token(
-                prisma_access_key, prisma_secret_key)
-        else:
-            logger.error("API returned %s.", status_code)
-
-    ###########################################################################
-    # Get collection IDs for host vulnerability correlation and write to CSV
-
-    end_of_page = False
-    offset = 0
-    LIMIT = 50
-
-    incremental_id = 0
-    new_file = True
-
-    while not end_of_page:
-        containers_response, status_code = prisma_get_containers_scan_results(
-            prisma_token, offset=offset, limit=LIMIT, collection=COLLECTIONS_FILTER
-        )
-        if status_code == 200:
-            if containers_response:
-                csv_rows = list()
-
-                for container in containers_response:
-                    hostname = container["hostname"]
-                    if hostname in host_vulnerability_dict:
-                        for vuln in host_vulnerability_dict[hostname]:
-                            vuln.update({"Incremental_ID": incremental_id})
-
-                            csv_rows.append(vuln)
-
-                            incremental_id += 1
-
-                        # remove the hostname as it's already been added to the CSV
-                        host_vulnerability_dict.pop(hostname)
-
-                write_data_to_csv(
-                    file_path, csv_rows, host_vulnerability_fields, new_file
-                )
-                new_file = False
-            else:
-                end_of_page = True
-
-            offset += LIMIT
-        elif status_code == 401:
-            logger.error(
-                "Prisma token timed out, generating a new one and continuing.")
-
-            prisma_token = generate_prisma_token(
-                prisma_access_key, prisma_secret_key)
-        else:
-            logger.error("API returned %s.", status_code)
-
-
-@function_app.function_name(name="export_nexus_repo_vulnerability_csv")
-@function_app.schedule(arg_name="timer",
-                       schedule=registry_image_vulnerability_csv_cron_schedule,
-                       run_on_startup=False,
-                       use_monitor=True,
-                       )
-def export_nexus_repo_vulnerability_csv(timer: func.TimerRequest):
-    """
-    Gets registry image data from Prisma and export to CSV.
-
-    Parameters:
-        None
-
-    Returns:
-        None
-
-    """
-    todays_date = str(dt.datetime.today()).split()[0]
-    registry_image_blobstore_vulnerability_csv_name = os.getenv(
-        "REGISTRY_IMAGE_VULNERABILITY_CSV_NAME"
-    )
-    registry_image_blobstore_vulnerability_fields_of_interest = json.loads(
-        os.getenv("REGISTRY_IMAGE_VULNERABILITY_FIELDS_OF_INTEREST")
-    )
-    file_path = (
-        f"CSVs/{registry_image_blobstore_vulnerability_csv_name}_{todays_date}.csv"
-    )
-    prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
-    prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
-
-    registry_image_csv_fields = [
-        "resourceID",
-        "osDistroVersion",
-        "complianceIssues",
-        "exploit",
-        "isARM64",
-        "vulnerabilityDistribution",
-        "cvss",
-        "hostname",
-        "severity",
-        "type",
-        "discovered",
-        "cause",
-        "riskFactors",
-        "applicableRules",
-        "vulnerabilitiesCount",
-        "packages",
-        "complianceRiskScore",
-        "agentless",
-        "packageName",
-        "scanTime",
-        "firewallProtection",
-        "packageCorrelationDone",
-        "complianceDistribution",
-        "layers",
-        "cri",
-        "allCompliance",
-        "twistlock",
-        "binaryPkgs",
-        "vulnerabilityRiskScore",
-        "scanVersion",
-        "hosts",
-        "text",
-        "id",
-        "layerTime",
-        "registryType",
-        "packageManager",
-        "templates",
-        "collections",
-        "trustStatus",
-        "vecStr",
-        "complianceIssuesCount",
-        "status",
-        "title",
-        "cve",
-        "scanBuildDate",
-        "appEmbedded",
-        "wildFireUsage",
-        "osDistro",
-        "cloudMetadata",
-        "_id",
-        "osDistroRelease",
-        "startupBinaries",
-        "installedProducts",
-        "scanID",
-        "published",
-        "Secrets",
-        "image",
-        "applications",
-        "link",
-        "files",
-        "repoTag",
-        "creationTime",
-        "distro",
-        "description",
-        "binaries",
-        "fixDate",
-        "firstScanTime",
-        "packageVersion",
-        "repoDigests",
-        "pushTime",
-        "err",
-        "functionLayer",
-        "history",
-        "topLayer",
-        "instances",
-        "tags",
-        "labels",
-        "exploits",
-        "vulnTagInfos",
-    ]
-
-    ###########################################################################
-    # Generate Prisma Token
-
-    prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
-
-    ###########################################################################
-    # Delete the CSV file if it exists from a previous run
-
-    try:
-        os.remove(file_path)
-    except FileNotFoundError:
-        pass
-
-    ###########################################################################
-    # Get hosts from Prisma and write to CSV
-
-    end_of_page = False
-    new_file = True
-    offset = 0
-    page_limit = 50
-
-    while not end_of_page:
-        (
-            registry_image_response,
-            status_code,
-        ) = prisma_get_registry_image_scan_results(
-            prisma_token, offset=offset, limit=page_limit
-        )
-
-        if status_code == 200:
-            if registry_image_response:
-                ###############################################################
-                # Flatten vulnerability list for each blob
-                repo_vulnerability_dict = dict()
-
-                for registry_image in registry_image_response:
-                    if "vulnerabilities" in registry_image:
-                        if registry_image["vulnerabilities"]:
-                            resource_id = f"{registry_image['repoTag']['repo']}:{registry_image['repoTag']['tag']}"
-                            repo_vulnerability_dict.update({resource_id: {}})
-
-                            for vuln in registry_image["vulnerabilities"]:
-                                vulnerability_dict = {
-                                    "resourceID": resource_id}
-
-                                # Add the individual vulnerability information
                                 vulnerability_dict.update(
-                                    {
-                                        key: value
-                                        for key, value in vuln.items()
-                                        if (
-                                            key
-                                            in registry_image_blobstore_vulnerability_fields_of_interest
-                                        )
-                                    }
-                                )
-
-                                repo_vulnerability_dict[resource_id].update(
-                                    {vuln["cve"]: vulnerability_dict}
-                                )
-
-                ###############################################################
-                # Write to CSV
-                for repo in repo_vulnerability_dict.items():
-                    for vuln in repo_vulnerability_dict[repo[0]].items():
-                        write_data_to_csv(
-                            file_path,
-                            [vuln[1]],
-                            registry_image_csv_fields,
-                            new_file,
-                        )
-                        new_file = False
-                offset += page_limit
-            else:
-                end_of_page = True
-                break
-        elif status_code == 401:
-            logger.error(
-                "Prisma token timed out, generating a new one and continuing.")
-
-            prisma_token = generate_prisma_token(
-                prisma_access_key, prisma_secret_key)
-
-
-@function_app.function_name(name="export_tanzu_blobstore_vulnerability_csv")
-@function_app.schedule(arg_name="timer",
-                       schedule=tanzu_blobstore_vulnerability_csv_cron_schedule,
-                       run_on_startup=False,
-                       use_monitor=True,
-                       )
-def export_tanzu_blobstore_vulnerability_csv(timer: func.TimerRequest):
-    """
-    Gets tanzu blobstore data from Prisma and cleans up for exporting to CSV.
-
-    Parameters:
-        None
-
-    Returns:
-        None
-
-    """
-    todays_date = str(dt.datetime.today()).split()[0]
-
-    tanzu_blobstore_vulnerability_csv_name = os.getenv(
-        "TANZU_BLOBSTORE_VULNERABILITY_CSV_NAME"
-    )
-    tanzu_blobstore_vulnerability_fields_of_interest = json.loads(
-        os.getenv("TANZU_BLOBSTORE_VULNERABILITY_FIELDS_OF_INTEREST")
-    )
-    file_path = f"CSVs/{tanzu_blobstore_vulnerability_csv_name}_{todays_date}.csv"
-    prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
-    prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
-
-    tanzu_csv_fields = [
-        "packageCorrelationDone",
-        "firstScanTime",
-        "riskFactors",
-        "packageName",
-        "status",
-        "cvss",
-        "startupBinaries",
-        "_id",
-        "collections",
-        "packageVersion",
-        "packageManager",
-        "scanTime",
-        "link",
-        "history",
-        "osDistro",
-        "distro",
-        "pushTime",
-        "binaries",
-        "cause",
-        "twistlock",
-        "applications",
-        "image",
-        "isARM64",
-        "repoDigests",
-        "title",
-        "discovered",
-        "functionLayer",
-        "labels",
-        "cri",
-        "creationTime",
-        "Secrets",
-        "complianceRiskScore",
-        "tags",
-        "files",
-        "layerTime",
-        "repoTag",
-        "exploit",
-        "complianceIssuesCount",
-        "installedProducts",
-        "type",
-        "fixDate",
-        "osDistroVersion",
-        "id",
-        "complianceIssues",
-        "vecStr",
-        "cve",
-        "cloudMetadata",
-        "applicableRules",
-        "text",
-        "osDistroRelease",
-        "complianceDistribution",
-        "description",
-        "hostname",
-        "templates",
-        "packages",
-        "allCompliance",
-        "vulnerabilitiesCount",
-        "vulnerabilityRiskScore",
-        "published",
-        "vulnerabilityDistribution",
-        "severity",
-        "resourceGroupName",
-        "version",
-        "runtime",
-        "cloudControllerAddress",
-        "applicationName",
-        "handler",
-        "provider",
-        "lastModified",
-        "memory",
-        "architecture",
-        "name",
-        "timeout",
-        "defended",
-        "scannerVersion",
-        "defenderLayerARN",
-        "hash",
-        "accountID",
-        "region",
-        "exploits",
-    ]
-
-    ######################################################################################################################
-    # Generate Prisma Token
-
-    prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
-
-    ###########################################################################
-    # Delete the CSV file if it exists from a previous run
-
-    try:
-        os.remove(file_path)
-    except FileNotFoundError:
-        pass
-
-    ###########################################################################
-    # Get blobstore data from Prisma and write to CSV
-
-    end_of_page = False
-    new_file = True
-    offset = 0
-    page_limit = 50
-
-    while not end_of_page:
-        (
-            tanzu_blobstore_response,
-            status_code,
-        ) = prisma_get_tanzu_blob_store_scan_results(
-            prisma_token, offset=offset, limit=page_limit
-        )
-
-        if status_code == 200:
-            if tanzu_blobstore_response:
-                ###############################################################
-                # Flatten vulnerability list for each blob
-                vulnerability_list = list()
-
-                for blob in tanzu_blobstore_response:
-                    if "vulnerabilities" in blob:
-                        if blob["vulnerabilities"]:
-                            for vuln in blob["vulnerabilities"]:
-                                # Grab base host information
-                                vulnerability_dict = {
-                                    key: value
-                                    for key, value in blob.items()
-                                    if (
-                                        key
-                                        in tanzu_blobstore_vulnerability_fields_of_interest
-                                    )
-                                }
-
-                                # Add the individual vulnerability information
-                                vulnerability_dict.update(
-                                    {
-                                        key: value
-                                        for key, value in vuln.items()
-                                        if (
-                                            key
-                                            in tanzu_blobstore_vulnerability_fields_of_interest
-                                        )
-                                    }
+                                    {"Incremental_ID": incremental_id}
                                 )
 
                                 vulnerability_list.append(vulnerability_dict)
 
-                ###############################################################
+                                incremental_id += 1
+
+                ##############################################################
                 # Write to CSV
                 write_data_to_csv(
-                    file_path, vulnerability_list, tanzu_csv_fields, new_file
+                    file_path, vulnerability_list, host_vulnerability_fields, new_file
                 )
                 new_file = False
 
@@ -1290,22 +969,18 @@ def export_tanzu_blobstore_vulnerability_csv(timer: func.TimerRequest):
                 end_of_page = True
                 break
         elif status_code == 401:
-            logger.error(
-                "Prisma token timed out, generating a new one and continuing.")
+            logger.error("Prisma token timed out, generating a new one and continuing.")
 
-            prisma_token = generate_prisma_token(
-                prisma_access_key, prisma_secret_key)
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
         else:
             logger.error("API returned %s.", status_code)
 
+    return func.HttpResponse("This HTTP triggered function executed successfully.")
+
 
 @function_app.function_name(name="export_tas_containers_csv")
-@function_app.schedule(arg_name="timer",
-                       schedule=tas_vulnerability_csv_cron_schedule,
-                       run_on_startup=False,
-                       use_monitor=True,
-                       )
-def export_tas_containers_csv(timer: func.TimerRequest):
+@app.route(route="export_tas_containers_csv")
+def export_tas_containers_csv(req: func.HttpRequest):
     """
     Gets container data from Prisma and transforms for CSV friendly data.
 
@@ -1317,9 +992,9 @@ def export_tas_containers_csv(timer: func.TimerRequest):
 
     """
     containers_csv_name = os.getenv("TAS_CONTAINERS_CSV_NAME")
-    collections_filter = ", ".join(
-        json.loads(os.getenv("TAS_COLLECTIONS_FILTER")))
+    collections_filter = ", ".join(json.loads(os.getenv("TAS_COLLECTIONS_FILTER")))
     csv_fields = [
+        "Incremental_ID",
         "Namespace",
         "Container_Name",
         "Host_Name",
@@ -1329,6 +1004,7 @@ def export_tas_containers_csv(timer: func.TimerRequest):
         "Cluster",
         "Image_ID",
     ]
+
     todays_date = str(dt.datetime.today()).split()[0]
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
@@ -1358,15 +1034,14 @@ def export_tas_containers_csv(timer: func.TimerRequest):
 
             offset += LIMIT
         elif status_code == 401:
-            logger.error(
-                "Prisma token timed out, generating a new one and continuing.")
+            logger.error("Prisma token timed out, generating a new one and continuing.")
 
-            prisma_token = generate_prisma_token(
-                prisma_access_key, prisma_secret_key)
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
         else:
             logger.error("API returned %s.", status_code)
 
     csv_rows = list()
+    incremental_id = 0
 
     ###########################################################################
     # Transform and grab fields of interest
@@ -1385,10 +1060,11 @@ def export_tas_containers_csv(timer: func.TimerRequest):
                     "Collection": collection,
                 }
 
+                row_dict.update({"Incremental_ID": incremental_id})
+
                 # Variable fields
                 if "namespace" in container["info"]:
-                    row_dict.update(
-                        {"Namespace": container["info"]["namespace"]})
+                    row_dict.update({"Namespace": container["info"]["namespace"]})
                 else:
                     row_dict.update({"Namespace": ""})
 
@@ -1399,16 +1075,16 @@ def export_tas_containers_csv(timer: func.TimerRequest):
 
                 csv_rows.append(row_dict)
 
+                incremental_id += 1
+
     write_data_to_csv(file_path, csv_rows, csv_fields, new_file=True)
+
+    return func.HttpResponse("This HTTP triggered function executed successfully.")
 
 
 @function_app.function_name(name="export_tas_vulnerability_csv")
-@function_app.schedule(arg_name="timer",
-                       schedule=tas_vulnerability_csv_cron_schedule,
-                       run_on_startup=False,
-                       use_monitor=True,
-                       )
-def export_tas_vulnerability_csv(timer: func.TimerRequest):
+@app.route(route="export_tas_vulnerability_csv")
+def export_tas_vulnerability_csv(req: func.HttpRequest):
     """
     Gets tanzu application service data from Prisma and export to CSV.
 
@@ -1420,10 +1096,8 @@ def export_tas_vulnerability_csv(timer: func.TimerRequest):
 
     """
     todays_date = str(dt.datetime.today()).split()[0]
-    COLLECTIONS_FILTER = ", ".join(
-        json.loads(os.getenv("TAS_COLLECTIONS_FILTER")))
-    tas_blobstore_vulnerability_csv_name = os.getenv(
-        "TAS_VULNERABILITY_CSV_NAME")
+    COLLECTIONS_FILTER = ", ".join(json.loads(os.getenv("TAS_COLLECTIONS_FILTER")))
+    tas_blobstore_vulnerability_csv_name = os.getenv("TAS_VULNERABILITY_CSV_NAME")
     tas_blobstore_vulnerability_fields_of_interest = json.loads(
         os.getenv("TAS_VULNERABILITY_FIELDS_OF_INTEREST")
     )
@@ -1431,10 +1105,10 @@ def export_tas_vulnerability_csv(timer: func.TimerRequest):
     file_path = f"CSVs/{tas_blobstore_vulnerability_csv_name}_{todays_date}.csv"
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
-    external_labels_to_include = json.loads(
-        os.getenv("TAS_EXTERNAL_LABELS_TO_INCLUDE"))
+    external_labels_to_include = json.loads(os.getenv("TAS_EXTERNAL_LABELS_TO_INCLUDE"))
 
     tas_csv_fields = [
+        "Incremental_ID",
         "labels",
         "type",
         "appEmbedded",
@@ -1554,7 +1228,10 @@ def export_tas_vulnerability_csv(timer: func.TimerRequest):
             tas_response,
             status_code,
         ) = prisma_get_images_scan_results(
-            prisma_token, offset=offset, limit=page_limit, collection=COLLECTIONS_FILTER
+            prisma_token,
+            offset=offset,
+            limit=page_limit,
+            collection=COLLECTIONS_FILTER,
         )
 
         if status_code == 200:
@@ -1567,21 +1244,12 @@ def export_tas_vulnerability_csv(timer: func.TimerRequest):
                         for external_label in tas["externalLabels"]:
                             if external_label["key"] in external_labels_to_include:
                                 external_labels.update(
-                                    {external_label["key"]
-                                        : external_label["value"]}
+                                    {external_label["key"]: external_label["value"]}
                                 )
                     if "vulnerabilities" in tas:
                         if tas["vulnerabilities"]:
                             for vuln in tas["vulnerabilities"]:
-                                # Grab base host information
-                                vulnerability_dict = {
-                                    key: value
-                                    for key, value in tas.items()
-                                    if (
-                                        key
-                                        in tas_blobstore_vulnerability_fields_of_interest
-                                    )
-                                }
+                                vulnerability_dict = {"resourceID": tas["_id"]}
 
                                 # Add the individual vulnerability information
                                 vulnerability_dict.update(
@@ -1670,11 +1338,9 @@ def export_tas_vulnerability_csv(timer: func.TimerRequest):
                 end_of_page = True
                 break
         elif status_code == 401:
-            logger.error(
-                "Prisma token timed out, generating a new one and continuing.")
+            logger.error("Prisma token timed out, generating a new one and continuing.")
 
-            prisma_token = generate_prisma_token(
-                prisma_access_key, prisma_secret_key)
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
         else:
             logger.error("API returned %s.", status_code)
 
@@ -1708,18 +1374,813 @@ def export_tas_vulnerability_csv(timer: func.TimerRequest):
                         # remove the image ID as it's already been added to the CSV
                         tas_vulnerability_dict.pop(IMAGE_ID)
 
-                write_data_to_csv(file_path, csv_rows,
-                                  tas_csv_fields, new_file)
+                write_data_to_csv(file_path, csv_rows, tas_csv_fields, new_file)
                 new_file = False
             else:
                 end_of_page = True
 
             offset += LIMIT
         elif status_code == 401:
-            logger.error(
-                "Prisma token timed out, generating a new one and continuing.")
+            logger.error("Prisma token timed out, generating a new one and continuing.")
 
-            prisma_token = generate_prisma_token(
-                prisma_access_key, prisma_secret_key)
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
         else:
             logger.error("API returned %s.", status_code)
+
+    return func.HttpResponse("This HTTP triggered function executed successfully.")
+
+
+@function_app.function_name(name="export_tas_application_csv")
+@app.route(route="export_tas_application_csv")
+def export_tas_application_csv(req: func.HttpRequest):
+    """
+    Gets tanzu application service data from Prisma and export to CSV.
+
+    Parameters:
+        None
+
+    Returns:
+        None
+
+    """
+    todays_date = str(dt.datetime.today()).split()[0]
+    COLLECTIONS_FILTER = ", ".join(json.loads(os.getenv("TAS_COLLECTIONS_FILTER")))
+    tas_blobstore_application_csv_name = os.getenv("TAS_APPLICATION_CSV_NAME")
+    tas_blobstore_application_fields_of_interest = json.loads(
+        os.getenv("TAS_APPLICATION_FIELDS_OF_INTEREST")
+    )
+
+    file_path = f"CSVs/{tas_blobstore_application_csv_name}_{todays_date}.csv"
+    prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
+    prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
+    external_labels_to_include = json.loads(os.getenv("TAS_EXTERNAL_LABELS_TO_INCLUDE"))
+
+    tas_csv_fields = [
+        "Incremental_ID",
+        "osDistroVersion",
+        "packageCorrelationDone",
+        "complianceIssues",
+        "pushTime",
+        "applications",
+        "isARM64",
+        "hosts",
+        "_id",
+        "id",
+        "startupBinaries",
+        "repoTag",
+        "appEmbedded",
+        "vulnerabilitiesCount",
+        "installedProducts",
+        "osDistro",
+        "scanID",
+        "err",
+        "scanVersion",
+        "collections",
+        "allCompliance",
+        "firstScanTime",
+        "vulnerabilityDistribution",
+        "firewallProtection",
+        "wildFireUsage",
+        "scanTime",
+        "tags",
+        "complianceDistribution",
+        "instances",
+        "osDistroRelease",
+        "packageManager",
+        "complianceIssuesCount",
+        "hostname",
+        "agentless",
+        "vulnerabilityRiskScore",
+        "type",
+        "complianceRiskScore",
+        "clusters",
+        "Secrets",
+        "image",
+        "cloudMetadata",
+        "trustStatus",
+        "distro",
+        "creationTime",
+        "repoDigests",
+        "binaries",
+        "packages",
+        "files",
+        "riskFactors",
+        "history",
+    ]
+
+    for external_label in external_labels_to_include:
+        tas_csv_fields.append(external_label)
+
+    ###########################################################################
+    # Generate Prisma Token
+
+    prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+
+    try:
+        os.remove(file_path)
+    except FileNotFoundError:
+        pass
+
+    ###########################################################################
+    # Get images from Prisma and write to CSV
+
+    end_of_page = False
+    new_file = True
+    offset = 0
+    page_limit = 50
+    tas_application_dict = dict()
+
+    while not end_of_page:
+        (
+            tas_response,
+            status_code,
+        ) = prisma_get_images_scan_results(
+            prisma_token, offset=offset, limit=page_limit, collection=COLLECTIONS_FILTER
+        )
+
+        if status_code == 200:
+            if tas_response:
+                ###############################################################
+                # Flatten application list for each blob
+                for tas in tas_response:
+                    external_labels = dict()
+                    if "externalLabels" in tas:
+                        for external_label in tas["externalLabels"]:
+                            if external_label["key"] in external_labels_to_include:
+                                external_labels.update(
+                                    {external_label["key"]: external_label["value"]}
+                                )
+                    # Grab base host information
+                    vulnerability_dict = {
+                        key: value
+                        for key, value in tas.items()
+                        if (key in tas_blobstore_application_fields_of_interest)
+                    }
+
+                    if tas["_id"] in tas_application_dict:
+                        tas_application_dict[tas["_id"]].append(vulnerability_dict)
+                    else:
+                        tas_application_dict.update({tas["_id"]: [vulnerability_dict]})
+
+                offset += page_limit
+            else:
+                end_of_page = True
+                break
+        elif status_code == 401:
+            logger.error("Prisma token timed out, generating a new one and continuing.")
+
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+        else:
+            logger.error("API returned %s.", status_code)
+
+    ###########################################################################
+    # Get collection IDs for TAS vulnerability correlation and write to CSV
+
+    end_of_page = False
+    offset = 0
+    LIMIT = 50
+    incremental_id = 0
+    new_file = True
+
+    while not end_of_page:
+        containers_response, status_code = prisma_get_containers_scan_results(
+            prisma_token, offset=offset, limit=LIMIT, collection=COLLECTIONS_FILTER
+        )
+        if status_code == 200:
+            if containers_response:
+                csv_rows = list()
+
+                for container in containers_response:
+                    IMAGE_ID = container["info"]["imageID"]
+                    if IMAGE_ID in tas_application_dict:
+                        for vuln in tas_application_dict[IMAGE_ID]:
+                            vuln.update({"Incremental_ID": incremental_id})
+
+                            csv_rows.append(vuln)
+
+                            incremental_id += 1
+
+                        # remove the image ID as it's already been added to the CSV
+                        tas_application_dict.pop(IMAGE_ID)
+
+                write_data_to_csv(file_path, csv_rows, tas_csv_fields, new_file)
+                new_file = False
+            else:
+                end_of_page = True
+
+            offset += LIMIT
+        elif status_code == 401:
+            logger.error("Prisma token timed out, generating a new one and continuing.")
+
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+        else:
+            logger.error("API returned %s.", status_code)
+
+    return func.HttpResponse("This HTTP triggered function executed successfully.")
+
+
+@function_app.function_name(name="export_nexus_repo_application_csv")
+@app.route(route="export_nexus_repo_application_csv")
+def export_nexus_repo_application_csv(req: func.HttpRequest):
+    """
+    Gets registry image data from Prisma and export to CSV.
+
+    Parameters:
+        None
+
+    Returns:
+        None
+
+    """
+    todays_date = str(dt.datetime.today()).split()[0]
+    registry_image_blobstore_application_csv_name = os.getenv(
+        "REGISTRY_IMAGE_APPLICATION_CSV_NAME"
+    )
+    registry_image_blobstore_application_fields_of_interest = json.loads(
+        os.getenv("REGISTRY_IMAGE_APPLICATION_FIELDS_OF_INTEREST")
+    )
+    file_path = (
+        f"CSVs/{registry_image_blobstore_application_csv_name}_{todays_date}.csv"
+    )
+    prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
+    prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
+
+    registry_image_csv_fields = [
+        "Incremental_ID",
+        "pushTime",
+        "startupBinaries",
+        "history",
+        "vulnerabilitiesCount",
+        "wildFireUsage",
+        "osDistroVersion",
+        "isARM64",
+        "repoDigests",
+        "packageCorrelationDone",
+        "osDistro",
+        "repoTag",
+        "vulnerabilityRiskScore",
+        "installedProducts",
+        "files",
+        "hosts",
+        "firstScanTime",
+        "trustStatus",
+        "complianceIssuesCount",
+        "firewallProtection",
+        "complianceRiskScore",
+        "collections",
+        "Secrets",
+        "err",
+        "image",
+        "riskFactors",
+        "complianceIssues",
+        "cloudMetadata",
+        "allCompliance",
+        "scanTime",
+        "appEmbedded",
+        "creationTime",
+        "agentless",
+        "packages",
+        "_id",
+        "complianceDistribution",
+        "binaries",
+        "packageManager",
+        "tags",
+        "instances",
+        "osDistroRelease",
+        "vulnerabilityDistribution",
+        "resourceID",
+        "type",
+        "hostname",
+        "id",
+        "scanID",
+        "registryType",
+        "distro",
+        "topLayer",
+        "scanVersion",
+        "scanBuildDate",
+        "layers",
+        "applications",
+    ]
+
+    ###########################################################################
+    # Generate Prisma Token
+
+    prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+
+    try:
+        os.remove(file_path)
+    except FileNotFoundError:
+        pass
+
+    ###########################################################################
+    # Get registry images from Prisma and write to CSV
+
+    end_of_page = False
+    new_file = True
+    offset = 0
+    incremental_id = 0
+    page_limit = 50
+
+    while not end_of_page:
+        registry_image_list = list()
+
+        (
+            registry_image_response,
+            status_code,
+        ) = prisma_get_registry_image_scan_results(
+            prisma_token, offset=offset, limit=page_limit
+        )
+
+        if status_code == 200:
+            if registry_image_response:
+                ###############################################################
+                # Flatten application list for each blob
+                repo_application_dict = dict()
+
+                for registry_image in registry_image_response:
+                    resource_id = f"{registry_image['repoTag']['repo']}:{registry_image['repoTag']['tag']}"
+                    repo_application_dict.update({resource_id: {}})
+
+                    application_dict = {
+                        "Incremental_ID": incremental_id,
+                        "resourceID": resource_id,
+                    }
+
+                    # Add the base application information
+                    application_dict.update(
+                        {
+                            key: value
+                            for key, value in registry_image.items()
+                            if (
+                                key
+                                in registry_image_blobstore_application_fields_of_interest
+                            )
+                        }
+                    )
+
+                    registry_image_list.append(application_dict)
+
+                    incremental_id += 1
+
+                ##############################################################
+                # Write to CSV
+                write_data_to_csv(
+                    file_path, registry_image_list, registry_image_csv_fields, new_file
+                )
+                new_file = False
+
+                offset += page_limit
+            else:
+                end_of_page = True
+                break
+        elif status_code == 401:
+            logger.error("Prisma token timed out, generating a new one and continuing.")
+
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+
+    return func.HttpResponse("This HTTP triggered function executed successfully.")
+
+
+@function_app.function_name(name="export_nexus_repo_vulnerability_csv")
+@app.route(route="export_nexus_repo_vulnerability_csv")
+def export_nexus_repo_vulnerability_csv(req: func.HttpRequest):
+    """
+    Gets registry image data from Prisma and export to CSV.
+
+    Parameters:
+        None
+
+    Returns:
+        None
+
+    """
+    todays_date = str(dt.datetime.today()).split()[0]
+    registry_image_blobstore_vulnerability_csv_name = os.getenv(
+        "REGISTRY_IMAGE_VULNERABILITY_CSV_NAME"
+    )
+    registry_image_blobstore_vulnerability_fields_of_interest = json.loads(
+        os.getenv("REGISTRY_IMAGE_VULNERABILITY_FIELDS_OF_INTEREST")
+    )
+    file_path = (
+        f"CSVs/{registry_image_blobstore_vulnerability_csv_name}_{todays_date}.csv"
+    )
+    prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
+    prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
+
+    registry_image_csv_fields = [
+        "Incremental_ID",
+        "Resource_ID",
+        "riskFactors",
+        "twistlock",
+        "cri",
+        "cve",
+        "cvss",
+        "fixDate",
+        "published",
+        "description",
+        "resourceID",
+        "packageVersion",
+        "text",
+        "status",
+        "functionLayer",
+        "vecStr",
+        "layerTime",
+        "exploit",
+        "title",
+        "link",
+        "type",
+        "packageName",
+        "templates",
+        "applicableRules",
+        "discovered",
+        "id",
+        "binaryPkgs",
+        "severity",
+        "cause",
+    ]
+
+    ###########################################################################
+    # Generate Prisma Token
+
+    prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+
+    try:
+        os.remove(file_path)
+    except FileNotFoundError:
+        pass
+
+    ###########################################################################
+    # Get registry images from Prisma and write to CSV
+
+    end_of_page = False
+    new_file = True
+    offset = 0
+    page_limit = 50
+
+    while not end_of_page:
+        (
+            registry_image_response,
+            status_code,
+        ) = prisma_get_registry_image_scan_results(
+            prisma_token, offset=offset, limit=page_limit
+        )
+
+        if status_code == 200:
+            if registry_image_response:
+                ###############################################################
+                # Flatten vulnerability list for each blob
+                repo_vulnerability_dict = dict()
+
+                for registry_image in registry_image_response:
+                    if "vulnerabilities" in registry_image:
+                        if registry_image["vulnerabilities"]:
+                            resource_id = f"{registry_image['repoTag']['repo']}:{registry_image['repoTag']['tag']}"
+                            repo_vulnerability_dict.update({resource_id: {}})
+
+                            for vuln in registry_image["vulnerabilities"]:
+                                vulnerability_dict = {"Resource_ID": resource_id}
+
+                                # Add the individual vulnerability information
+                                vulnerability_dict.update(
+                                    {
+                                        key: value
+                                        for key, value in vuln.items()
+                                        if (
+                                            key
+                                            in registry_image_blobstore_vulnerability_fields_of_interest
+                                        )
+                                    }
+                                )
+
+                                repo_vulnerability_dict[resource_id].update(
+                                    {vuln["cve"]: vulnerability_dict}
+                                )
+
+                ###############################################################
+                # Write to CSV
+                incremental_id = 0
+                for repo in repo_vulnerability_dict.items():
+                    for vuln in repo_vulnerability_dict[repo[0]].items():
+                        vuln[1].update({"Incremental_ID": incremental_id})
+                        write_data_to_csv(
+                            file_path,
+                            [vuln[1]],
+                            registry_image_csv_fields,
+                            new_file,
+                        )
+                        new_file = False
+                        incremental_id += 1
+                offset += page_limit
+            else:
+                end_of_page = True
+                break
+        elif status_code == 401:
+            logger.error("Prisma token timed out, generating a new one and continuing.")
+
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+
+    return func.HttpResponse("This HTTP triggered function executed successfully.")
+
+
+@function_app.function_name(name="export_tanzu_blobstore_application_csv")
+@app.route(route="export_tanzu_blobstore_application_csv")
+def export_tanzu_blobstore_application_csv(req: func.HttpRequest):
+    """
+    Gets tanzu blobstore data from Prisma and cleans up for exporting to CSV.
+
+    Parameters:
+        None
+
+    Returns:
+        None
+
+    """
+    todays_date = str(dt.datetime.today()).split()[0]
+
+    tanzu_blobstore_application_csv_name = os.getenv(
+        "TANZU_BLOBSTORE_APPLICATION_CSV_NAME"
+    )
+    tanzu_blobstore_application_fields_of_interest = json.loads(
+        os.getenv("TANZU_BLOBSTORE_APPLICATION_FIELDS_OF_INTEREST")
+    )
+    file_path = f"CSVs/{tanzu_blobstore_application_csv_name}_{todays_date}.csv"
+    prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
+    prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
+
+    tanzu_csv_fields = [
+        "Incremental_ID",
+        "packages",
+        "creationTime",
+        "name",
+        "osDistro",
+        "accountID",
+        "repoTag",
+        "complianceRiskScore",
+        "repoDigests",
+        "osDistroVersion",
+        "applications",
+        "cloudMetadata",
+        "timeout",
+        "version",
+        "defenderLayerARN",
+        "vulnerabilitiesCount",
+        "image",
+        "packageManager",
+        "collections",
+        "provider",
+        "region",
+        "lastModified",
+        "tags",
+        "riskFactors",
+        "id",
+        "pushTime",
+        "vulnerabilityDistribution",
+        "installedProducts",
+        "history",
+        "labels",
+        "complianceIssues",
+        "scanTime",
+        "binaries",
+        "allCompliance",
+        "complianceDistribution",
+        "defended",
+        "hash",
+        "complianceIssuesCount",
+        "files",
+        "scannerVersion",
+        "vulnerabilityRiskScore",
+        "firstScanTime",
+        "type",
+        "isARM64",
+        "runtime",
+        "hostname",
+        "distro",
+        "Secrets",
+        "_id",
+        "architecture",
+        "osDistroRelease",
+        "memory",
+        "description",
+        "handler",
+        "resourceGroupName",
+        "cloudControllerAddress",
+        "applicationName",
+        "startupBinaries",
+        "packageCorrelationDone",
+    ]
+
+    ###########################################################################
+    # Generate Prisma Token
+
+    prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+
+    try:
+        os.remove(file_path)
+    except FileNotFoundError:
+        pass
+
+    ###########################################################################
+    # Get blobstore data from Prisma and write to CSV
+
+    end_of_page = False
+    new_file = True
+    offset = 0
+    incremental_id = 0
+    page_limit = 50
+
+    while not end_of_page:
+        (
+            tanzu_blobstore_response,
+            status_code,
+        ) = prisma_get_tanzu_blob_store_scan_results(
+            prisma_token, offset=offset, limit=page_limit
+        )
+
+        if status_code == 200:
+            if tanzu_blobstore_response:
+                ###############################################################
+                # Flatten application list for each blob
+                application_list = list()
+
+                for blob in tanzu_blobstore_response:
+                    application_dict = {"Incremental_ID": incremental_id}
+                    # Grab base host information
+                    application_dict.update(
+                        {
+                            key: value
+                            for key, value in blob.items()
+                            if (key in tanzu_blobstore_application_fields_of_interest)
+                        }
+                    )
+
+                    application_list.append(application_dict)
+                    incremental_id += 1
+
+                ###############################################################
+                # Write to CSV
+                write_data_to_csv(
+                    file_path, application_list, tanzu_csv_fields, new_file
+                )
+                new_file = False
+
+                offset += page_limit
+            else:
+                end_of_page = True
+                break
+        elif status_code == 401:
+            logger.error("Prisma token timed out, generating a new one and continuing.")
+
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+        else:
+            logger.error("API returned %s.", status_code)
+
+    return func.HttpResponse("This HTTP triggered function executed successfully.")
+
+
+@function_app.function_name(name="export_tanzu_blobstore_vulnerability_csv")
+@app.route(route="export_tanzu_blobstore_vulnerability_csv")
+def export_tanzu_blobstore_vulnerability_csv(req: func.HttpRequest):
+    """
+    Gets tanzu blobstore data from Prisma and cleans up for exporting to CSV.
+
+    Parameters:
+        None
+
+    Returns:
+        None
+
+    """
+    todays_date = str(dt.datetime.today()).split()[0]
+
+    tanzu_blobstore_vulnerability_csv_name = os.getenv(
+        "TANZU_BLOBSTORE_VULNERABILITY_CSV_NAME"
+    )
+    tanzu_blobstore_vulnerability_fields_of_interest = json.loads(
+        os.getenv("TANZU_BLOBSTORE_VULNERABILITY_FIELDS_OF_INTEREST")
+    )
+    file_path = f"CSVs/{tanzu_blobstore_vulnerability_csv_name}_{todays_date}.csv"
+    prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
+    prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
+
+    tanzu_csv_fields = [
+        "Incremental_ID",
+        "Resource_ID",
+        "link",
+        "description",
+        "cri",
+        "cvss",
+        "templates",
+        "vecStr",
+        "applicableRules",
+        "fixDate",
+        "packageVersion",
+        "status",
+        "twistlock",
+        "text",
+        "packageName",
+        "exploit",
+        "layerTime",
+        "title",
+        "functionLayer",
+        "severity",
+        "discovered",
+        "cve",
+        "type",
+        "id",
+        "cause",
+        "published",
+        "riskFactors",
+        "exploits",
+    ]
+
+    ######################################################################################################################
+    # Generate Prisma Token
+
+    prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+
+    try:
+        os.remove(file_path)
+    except FileNotFoundError:
+        pass
+
+    ###########################################################################
+    # Get blobstore data from Prisma and write to CSV
+
+    end_of_page = False
+    new_file = True
+    offset = 0
+    incremental_id = 0
+    page_limit = 50
+
+    while not end_of_page:
+        (
+            tanzu_blobstore_response,
+            status_code,
+        ) = prisma_get_tanzu_blob_store_scan_results(
+            prisma_token, offset=offset, limit=page_limit
+        )
+
+        if status_code == 200:
+            if tanzu_blobstore_response:
+                ###############################################################
+                # Flatten vulnerability list for each blob
+                vulnerability_list = list()
+
+                for blob in tanzu_blobstore_response:
+                    if "vulnerabilities" in blob:
+                        if blob["vulnerabilities"]:
+                            for vuln in blob["vulnerabilities"]:
+                                vulnerability_dict = {
+                                    "Incremental_ID": incremental_id,
+                                    "Resource_ID": blob["_id"],
+                                }
+
+                                # Add the individual vulnerability information
+                                vulnerability_dict.update(
+                                    {
+                                        key: value
+                                        for key, value in vuln.items()
+                                        if (
+                                            key
+                                            in tanzu_blobstore_vulnerability_fields_of_interest
+                                        )
+                                    }
+                                )
+
+                                vulnerability_list.append(vulnerability_dict)
+                                incremental_id += 1
+
+                ###############################################################
+                # Write to CSV
+                write_data_to_csv(
+                    file_path, vulnerability_list, tanzu_csv_fields, new_file
+                )
+                new_file = False
+
+                offset += page_limit
+            else:
+                end_of_page = True
+                break
+        elif status_code == 401:
+            logger.error("Prisma token timed out, generating a new one and continuing.")
+
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+        else:
+            logger.error("API returned %s.", status_code)
+
+    return func.HttpResponse("This HTTP triggered function executed successfully.")

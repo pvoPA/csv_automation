@@ -71,15 +71,19 @@ You can exit the virtual env by running the following command,
 
 * `deactivate`
 
-### API Calls made by export_applications_csv.py
-
-* [POST - Generate Prisma Token](https://pan.dev/prisma-cloud/api/cspm/app-login/)
-* [GET - Container Scan Results](https://pan.dev/prisma-cloud/api/cwpp/get-containers/)
-
 ### API Calls made by export_containers_csv.py
 
 * [POST - Generate Prisma Token](https://pan.dev/prisma-cloud/api/cspm/app-login/)
 * [GET - Container Scan Results](https://pan.dev/prisma-cloud/api/cwpp/get-containers/)
+
+### API Calls made by export_host_applications_csv.py
+
+* [POST - Generate Prisma Token](https://pan.dev/prisma-cloud/api/cspm/app-login/)
+* [GET - Host Scan Results](https://pan.dev/prisma-cloud/api/cwpp/get-hosts/)
+
+#### Available CSV Fields for export_host_applications_csv.py
+
+["Incremental_ID", "repoTag", "firewallProtection", "history", "creationTime", "packageManager", "complianceIssuesCount", "collections", "pushTime", "scanBuildDate", "osDistro", "labels", "scanVersion", "hostDevices", "err", "packageCorrelationDone", "scanID", "firstScanTime", "complianceDistribution", "startupBinaries", "vulnerabilityRiskScore", "image", "agentless", "tags", "appEmbedded", "wildFireUsage", "trustStatus", "hosts", "Secrets", "vulnerabilitiesCount", "type", "riskFactors", "osDistroRelease", "applications", "isARM64", "distro", "vulnerabilityDistribution", "complianceRiskScore", "allCompliance", "binaries", "instances", "files", "installedProducts", "scanTime", "complianceIssues", "cloudMetadata", "hostname", "_id", "packages", "osDistroVersion", "repoDigests", "externalLabels", "rhelRepos", "clusters", "k8sClusterAddr", "stopped", "ecsClusterName", ]
 
 ### API Calls made by export_host_vulnerability_csv.py
 
@@ -88,13 +92,32 @@ You can exit the virtual env by running the following command,
 
 #### Available CSV Fields for export_host_vulnerability_csv.py
 
-["_id", "type", "hostname", "scanTime", "osDistro", "osDistroVersion", "osDistroRelease", "distro", "isARM64", "packageCorrelationDone", "complianceIssues", "allCompliance", "repoTag", "tags", "repoDigests", "creationTime", "pushTime", "vulnerabilitiesCount", "complianceIssuesCount", "vulnerabilityDistribution", "complianceDistribution", "vulnerabilityRiskScore", "complianceRiskScore", "k8sClusterAddr", "riskFactors", "labels", "installedProducts", "scanVersion", "scanBuildDate", "hostDevices", "firstScanTime", "cloudMetadata", "clusters", "instances", "hosts", "err", "scanID", "trustStatus", "firewallProtection", "appEmbedded", "wildFireUsage", "agentless", "text", "id", "severity", "cvss", "status", "cve", "cause", "description", "title", "vecStr", "exploit", "link", "packageName", "packageVersion", "layerTime", "templates", "twistlock", "cri", "published", "fixDate", "applicableRules", "discovered", "vulnTagInfos"]
+["Incremental_ID", "Resource_ID", "Package_Path", "severity", "published", "vecStr", "exploit", "cri", "text", "type", "fixDate", "discovered", "title", "functionLayer", "cve", "twistlock", "riskFactors", "layerTime", "description", "link", "cause", "status", "templates", "applicableRules", "cvss", "id", "packageName", "packageVersion", "binaryPkgs", "exploits", "fixLink", "vulnTagInfos"]
 
-### API Calls made by export_image_vulnerability_csv.py
+### API Calls made by export_openshift_applications_csv.py
+
+* [POST - Generate Prisma Token](https://pan.dev/prisma-cloud/api/cspm/app-login/)
+* [GET - Container Scan Results](https://pan.dev/prisma-cloud/api/cwpp/get-containers/)
+
+### API Calls made by export_openshift_image_vulnerability_csv.py
 
 * [POST - Generate Prisma Token](https://pan.dev/prisma-cloud/api/cspm/app-login/)
 * [GET - Container Scan Results](https://pan.dev/prisma-cloud/api/cwpp/get-containers/)
 * [GET - Image Scan Results](https://pan.dev/prisma-cloud/api/cwpp/get-images/)
+
+#### Available CSV Fields for export_openshift_image_vulnerability_csv.py
+
+["osDistroVersion", "complianceIssues", "exploit", "isARM64", "vulnerabilityDistribution", "cvss", "hostname", "severity", "type", "discovered", "cause", "riskFactors", "applicableRules", "vulnerabilitiesCount", "packages", "complianceRiskScore", "agentless", "packageName", "scanTime", "firewallProtection", "packageCorrelationDone", "complianceDistribution", "layers", "cri", "allCompliance", "twistlock", "binaryPkgs", "vulnerabilityRiskScore", "scanVersion", "hosts", "text", "id", "layerTime", "registryType", "packageManager", "templates", "collections", "trustStatus", "vecStr", "complianceIssuesCount", "status", "title", "cve", "scanBuildDate", "appEmbedded", "wildFireUsage", "osDistro", "cloudMetadata", "_id", "osDistroRelease", "startupBinaries", "installedProducts", "scanID", "published", "Secrets", "image", "applications", "link", "files", "repoTag", "creationTime", "distro", "description", "binaries", "fixDate", "firstScanTime", "packageVersion", "repoDigests", "pushTime", "err", "functionLayer", "history", "topLayer", "instances", "tags", "labels", "exploits", "vulnTagInfos"]
+
+### API Calls made by export_registry_image_application_csv.py
+
+* [POST - Generate Prisma Token](https://pan.dev/prisma-cloud/api/cspm/app-login/)
+* [GET - Registry Image Scan Results](https://pan.dev/prisma-cloud/api/cwpp/get-registry/)
+
+#### Available CSV Fields for export_registry_image_application_csv.py
+
+["Incremental_ID", "pushTime", "startupBinaries", "history", "vulnerabilitiesCount", "wildFireUsage", "osDistroVersion", "isARM64", "repoDigests", "packageCorrelationDone", "osDistro", "repoTag", "vulnerabilityRiskScore", "installedProducts", "files", "hosts", "firstScanTime", "trustStatus", "complianceIssuesCount", "firewallProtection", "complianceRiskScore", "collections", "Secrets", "err", "image", "riskFactors", "complianceIssues", "cloudMetadata", "allCompliance", "scanTime", "appEmbedded", "creationTime", "agentless", "packages", "_id", "complianceDistribution", "binaries", "packageManager", "tags", "instances", "osDistroRelease", "vulnerabilityDistribution", "resourceID", "type", "hostname", "id", "scanID", "registryType", "distro", "topLayer", "scanVersion", "scanBuildDate", "layers", "applications"]
+
 
 ### API Calls made by export_registry_image_vulnerability_csv.py
 
@@ -103,7 +126,17 @@ You can exit the virtual env by running the following command,
 
 #### Available CSV Fields for export_registry_image_vulnerability_csv.py
 
-["osDistroVersion", "complianceIssues", "exploit", "isARM64", "vulnerabilityDistribution", "cvss", "hostname", "severity", "type", "discovered", "cause", "riskFactors", "applicableRules", "vulnerabilitiesCount", "packages", "complianceRiskScore", "agentless", "packageName", "scanTime", "firewallProtection", "packageCorrelationDone", "complianceDistribution", "layers", "cri", "allCompliance", "twistlock", "binaryPkgs", "vulnerabilityRiskScore", "scanVersion", "hosts", "text", "id", "layerTime", "registryType", "packageManager", "templates", "collections", "trustStatus", "vecStr", "complianceIssuesCount", "status", "title", "cve", "scanBuildDate", "appEmbedded", "wildFireUsage", "osDistro", "cloudMetadata", "_id", "osDistroRelease", "startupBinaries", "installedProducts", "scanID", "published", "Secrets", "image", "applications", "link", "files", "repoTag", "creationTime", "distro", "description", "binaries", "fixDate", "firstScanTime", "packageVersion", "repoDigests", "pushTime", "err", "functionLayer", "history", "topLayer", "instances", "tags", "labels", "exploits", "vulnTagInfos"]
+["Incremental_ID", "Resource_ID", "riskFactors", "twistlock", "cri", "cve", "cvss", "fixDate", "published", "description", "resourceID", "packageVersion", "text", "status", "functionLayer", "vecStr", "layerTime", "exploit", "title", "link", "type", "packageName", "templates", "applicableRules", "discovered", "id", "binaryPkgs", "severity", "cause"] 
+
+### API Calls made by export_tanzu_blobstore_application_csv.py
+
+* [POST - Generate Prisma Token](https://pan.dev/prisma-cloud/api/cspm/app-login/)
+* [GET - Tanzu Blobstore Scan Results]()
+  * Not available in documentation.
+
+#### Available CSV Fields for export_tanzu_blobstore_application_csv.py
+
+["Incremental_ID", "packages", "creationTime", "name", "osDistro", "accountID", "repoTag", "complianceRiskScore", "repoDigests", "osDistroVersion", "applications", "cloudMetadata", "timeout", "version", "defenderLayerARN", "vulnerabilitiesCount", "image", "packageManager", "collections", "provider", "region", "lastModified", "tags", "riskFactors", "id", "pushTime", "vulnerabilityDistribution", "installedProducts", "history", "labels", "complianceIssues", "scanTime", "binaries", "allCompliance", "complianceDistribution", "defended", "hash", "complianceIssuesCount", "files", "scannerVersion", "vulnerabilityRiskScore", "firstScanTime", "type", "isARM64", "runtime", "hostname", "distro", "Secrets", "_id", "architecture", "osDistroRelease", "memory", "description", "handler", "resourceGroupName", "cloudControllerAddress", "applicationName", "startupBinaries", "packageCorrelationDone"]
 
 ### API Calls made by export_tanzu_blobstore_vulnerability_csv.py
 
@@ -113,7 +146,17 @@ You can exit the virtual env by running the following command,
 
 #### Available CSV Fields for export_tanzu_blobstore_vulnerability_csv.py
 
-["packageCorrelationDone", "firstScanTime", "riskFactors", "packageName", "status", "cvss", "startupBinaries", "_id", "collections", "packageVersion", "packageManager", "scanTime", "link", "history", "osDistro", "distro", "pushTime", "binaries", "cause", "twistlock", "applications", "image", "isARM64", "repoDigests", "title", "discovered", "functionLayer", "labels", "cri", "creationTime", "Secrets", "complianceRiskScore", "tags", "files", "layerTime", "repoTag", "exploit", "complianceIssuesCount", "installedProducts", "type", "fixDate", "osDistroVersion", "id", "complianceIssues", "vecStr", "cve", "cloudMetadata", "applicableRules", "text", "osDistroRelease", "complianceDistribution", "description", "hostname", "templates", "packages", "allCompliance", "vulnerabilitiesCount", "vulnerabilityRiskScore", "published", "vulnerabilityDistribution", "severity", "resourceGroupName", "version", "runtime", "cloudControllerAddress", "applicationName", "handler", "provider", "lastModified", "memory", "architecture", "name", "timeout", "defended", "scannerVersion", "defenderLayerARN", "hash", "accountID", "region", "exploits"]
+["Incremental_ID", "Resource_ID", "link", "description", "cri", "cvss", "templates", "vecStr", "applicableRules", "fixDate", "packageVersion", "status", "twistlock", "text", "packageName", "exploit", "layerTime", "title", "functionLayer", "severity", "discovered", "cve", "type", "id", "cause", "published", "riskFactors", "exploits"]
+
+### API Calls made by export_tas_application_csv.py
+
+* [POST - Generate Prisma Token](https://pan.dev/prisma-cloud/api/cspm/app-login/)
+* [GET - Image Scan Results](https://pan.dev/prisma-cloud/api/cwpp/get-images/)
+
+#### Available CSV Fields for export_tas_application_csv
+
+["Incremental_ID", "osDistroVersion", "packageCorrelationDone", "complianceIssues", "pushTime", "applications", "isARM64", "hosts", "_id", "id", "startupBinaries", "repoTag", "appEmbedded", "vulnerabilitiesCount", "installedProducts", "osDistro", "scanID", "err", "scanVersion", "collections", "allCompliance", "firstScanTime", "vulnerabilityDistribution", "firewallProtection", "wildFireUsage", "scanTime", "tags", "complianceDistribution", "instances", "osDistroRelease", "packageManager", "complianceIssuesCount", "hostname", "agentless", "vulnerabilityRiskScore", "type", "complianceRiskScore", "clusters", "Secrets", "image", "cloudMetadata", "trustStatus", "distro", "creationTime", "repoDigests", "binaries", "packages", "files", "riskFactors", "history"]
+
 
 ### API Calls made by export_tas_vulnerability_csv.py
 
@@ -122,4 +165,4 @@ You can exit the virtual env by running the following command,
 
 #### Available CSV Fields for export_tas_vulnerability_csv
 
-["labels", "type", "appEmbedded", "description", "firewallProtection", "clusters", "hostname", "scanVersion", "tags", "scanBuildDate", "Secrets", "binaries", "packageCorrelationDone", "layerTime", "scanTime", "wildFireUsage", "twistlock", "packages", "published", "_id", "complianceIssues", "distro", "text", "repoDigests", "hosts", "scanID", "vulnerabilitiesCount", "packageName", "isARM64", "id", "allCompliance", "status", "err", "severity", "cri", "functionLayer", "osDistro", "osDistroRelease", "creationTime", "cloudMetadata", "layers", "collections", "cause", "topLayer", "packageVersion", "exploit", "applicableRules", "trustStatus", "vulnerabilityRiskScore", "repoTag", "vulnerabilityDistribution", "vecStr", "instances", "title", "complianceDistribution", "firstScanTime", "cvss", "startupBinaries", "image", "link", "riskFactors", "pushTime", "complianceRiskScore", "files", "history", "agentless", "installedProducts", "complianceIssuesCount", "cve", "templates", "fixDate", "discovered", "osDistroVersion", "packageManager", "binaryPkgs", "exploits", "applications", "vulnTagInfos", "missingDistroVulnCoverage", "namespaces", "externalLabels", "rhelRepos", "gracePeriodDays", "block", "twistlockImage"]
+["Incremental_ID", "Resource_ID", "labels", "type", "appEmbedded", "description", "firewallProtection", "clusters", "hostname", "scanVersion", "tags", "scanBuildDate", "Secrets", "binaries", "packageCorrelationDone", "layerTime", "scanTime", "wildFireUsage", "twistlock", "packages", "published", "_id", "complianceIssues", "distro", "text", "repoDigests", "hosts", "scanID", "vulnerabilitiesCount", "packageName", "isARM64", "id", "allCompliance", "status", "err", "severity", "cri", "functionLayer", "osDistro", "osDistroRelease", "creationTime", "cloudMetadata", "layers", "collections", "cause", "topLayer", "packageVersion", "exploit", "applicableRules", "trustStatus", "vulnerabilityRiskScore", "repoTag", "vulnerabilityDistribution", "vecStr", "instances", "title", "complianceDistribution", "firstScanTime", "cvss", "startupBinaries", "image", "link", "riskFactors", "pushTime", "complianceRiskScore", "files", "history", "agentless", "installedProducts", "complianceIssuesCount", "cve", "templates", "fixDate", "discovered", "osDistroVersion", "packageManager", "binaryPkgs", "exploits", "applications", "vulnTagInfos", "missingDistroVulnCoverage", "namespaces", "externalLabels", "rhelRepos", "gracePeriodDays", "block", "twistlockImage", "Package_Path"]

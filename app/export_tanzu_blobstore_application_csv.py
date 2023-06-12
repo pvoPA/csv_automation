@@ -1,19 +1,19 @@
 """
-Exports vulnerability data to CSV on tanzu blob store resources
+Exports application data to CSV on tanzu blob store resources
     in Prisma Cloud.
 
-This script is used to retrieve vulnerability data for
+This script is used to retrieve application data for
     tanzu blob store resources and exports it to
     a CSV file with the following actions,
         - Generate Prisma Token
         - Delete the CSV file if it exists from a previous run
         - Grab tanzu blob store scan results
         - For each API call,
-            - Flatten vulnerability list for each blob
+            - Flatten application list for each blob
             - Write to CSV (Create a CSV directory and file.)
 
 Usage:
-    python export_tanzu_blobstore_vulnerability_csv.py
+    python export_tanzu_blobstore_application_csv.py
 
 Options:
 
@@ -24,7 +24,7 @@ Requirements:
         - PRISMA_SECRET_KEY
 
 Example:
-    python export_tanzu_blobstore_vulnerability_csv.py
+    python export_tanzu_blobstore_application_csv.py
 
 Note:
     This script is meant to be deployed in the following platforms,
@@ -44,7 +44,7 @@ from helpers import generate_prisma_token
 from helpers import write_data_to_csv
 
 
-def etl_tanzu_blobstore_vulnerabilities_csv():
+def etl_tanzu_blobstore_applications_csv():
     """
     Gets tanzu blobstore data from Prisma and cleans up for exporting to CSV.
 
@@ -57,48 +57,79 @@ def etl_tanzu_blobstore_vulnerabilities_csv():
     """
     todays_date = str(dt.datetime.today()).split()[0]
 
-    tanzu_blobstore_vulnerability_csv_name = os.getenv(
-        "TANZU_BLOBSTORE_VULNERABILITY_CSV_NAME"
+    tanzu_blobstore_application_csv_name = os.getenv(
+        "TANZU_BLOBSTORE_APPLICATION_CSV_NAME"
     )
-    tanzu_blobstore_vulnerability_fields_of_interest = json.loads(
-        os.getenv("TANZU_BLOBSTORE_VULNERABILITY_FIELDS_OF_INTEREST")
+    tanzu_blobstore_application_fields_of_interest = json.loads(
+        os.getenv("TANZU_BLOBSTORE_APPLICATION_FIELDS_OF_INTEREST")
     )
-    file_path = f"CSVs/{tanzu_blobstore_vulnerability_csv_name}_{todays_date}.csv"
+    file_path = f"CSVs/{tanzu_blobstore_application_csv_name}_{todays_date}.csv"
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
 
     tanzu_csv_fields = [
         "Incremental_ID",
-        "Resource_ID",
-        "link",
-        "description",
-        "cri",
-        "cvss",
-        "templates",
-        "vecStr",
-        "applicableRules",
-        "fixDate",
-        "packageVersion",
-        "status",
-        "twistlock",
-        "text",
-        "packageName",
-        "exploit",
-        "layerTime",
-        "title",
-        "functionLayer",
-        "severity",
-        "discovered",
-        "cve",
-        "type",
-        "id",
-        "cause",
-        "published",
+        "packages",
+        "creationTime",
+        "name",
+        "osDistro",
+        "accountID",
+        "repoTag",
+        "complianceRiskScore",
+        "repoDigests",
+        "osDistroVersion",
+        "applications",
+        "cloudMetadata",
+        "timeout",
+        "version",
+        "defenderLayerARN",
+        "vulnerabilitiesCount",
+        "image",
+        "packageManager",
+        "collections",
+        "provider",
+        "region",
+        "lastModified",
+        "tags",
         "riskFactors",
-        "exploits",
+        "id",
+        "pushTime",
+        "vulnerabilityDistribution",
+        "installedProducts",
+        "history",
+        "labels",
+        "complianceIssues",
+        "scanTime",
+        "binaries",
+        "allCompliance",
+        "complianceDistribution",
+        "defended",
+        "hash",
+        "complianceIssuesCount",
+        "files",
+        "scannerVersion",
+        "vulnerabilityRiskScore",
+        "firstScanTime",
+        "type",
+        "isARM64",
+        "runtime",
+        "hostname",
+        "distro",
+        "Secrets",
+        "_id",
+        "architecture",
+        "osDistroRelease",
+        "memory",
+        "description",
+        "handler",
+        "resourceGroupName",
+        "cloudControllerAddress",
+        "applicationName",
+        "startupBinaries",
+        "packageCorrelationDone",
     ]
 
-    ######################################################################################################################
+    ###########################################################################
     # Generate Prisma Token
 
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
@@ -131,37 +162,27 @@ def etl_tanzu_blobstore_vulnerabilities_csv():
         if status_code == 200:
             if tanzu_blobstore_response:
                 ###############################################################
-                # Flatten vulnerability list for each blob
-                vulnerability_list = list()
+                # Flatten application list for each blob
+                application_list = list()
 
                 for blob in tanzu_blobstore_response:
-                    if "vulnerabilities" in blob:
-                        if blob["vulnerabilities"]:
-                            for vuln in blob["vulnerabilities"]:
-                                vulnerability_dict = {
-                                    "Incremental_ID": incremental_id,
-                                    "Resource_ID": blob["_id"],
-                                }
+                    application_dict = {"Incremental_ID": incremental_id}
+                    # Grab base host information
+                    application_dict.update(
+                        {
+                            key: value
+                            for key, value in blob.items()
+                            if (key in tanzu_blobstore_application_fields_of_interest)
+                        }
+                    )
 
-                                # Add the individual vulnerability information
-                                vulnerability_dict.update(
-                                    {
-                                        key: value
-                                        for key, value in vuln.items()
-                                        if (
-                                            key
-                                            in tanzu_blobstore_vulnerability_fields_of_interest
-                                        )
-                                    }
-                                )
-
-                                vulnerability_list.append(vulnerability_dict)
-                                incremental_id += 1
+                    application_list.append(application_dict)
+                    incremental_id += 1
 
                 ###############################################################
                 # Write to CSV
                 write_data_to_csv(
-                    file_path, vulnerability_list, tanzu_csv_fields, new_file
+                    file_path, application_list, tanzu_csv_fields, new_file
                 )
                 new_file = False
 
@@ -178,6 +199,6 @@ def etl_tanzu_blobstore_vulnerabilities_csv():
 
 
 if __name__ == "__main__":
-    logger.info("Creating tanzu blobstore vulnerabilities CSV...")
+    logger.info("Creating tanzu blobstore applications CSV...")
 
-    etl_tanzu_blobstore_vulnerabilities_csv()
+    etl_tanzu_blobstore_applications_csv()

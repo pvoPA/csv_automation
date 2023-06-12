@@ -19,6 +19,7 @@ def etl_containers_csv(collections_filter, containers_csv_name):
 
     """
     csv_fields = [
+        "Incremental_ID",
         "Namespace",
         "Container_Name",
         "Host_Name",
@@ -58,15 +59,14 @@ def etl_containers_csv(collections_filter, containers_csv_name):
 
             offset += LIMIT
         elif status_code == 401:
-            logger.error(
-                "Prisma token timed out, generating a new one and continuing.")
+            logger.error("Prisma token timed out, generating a new one and continuing.")
 
-            prisma_token = generate_prisma_token(
-                prisma_access_key, prisma_secret_key)
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
         else:
             logger.error("API returned %s.", status_code)
 
     csv_rows = list()
+    incremental_id = 0
 
     ###########################################################################
     # Transform and grab fields of interest
@@ -85,10 +85,11 @@ def etl_containers_csv(collections_filter, containers_csv_name):
                     "Collection": collection,
                 }
 
+                row_dict.update({"Incremental_ID": incremental_id})
+
                 # Variable fields
                 if "namespace" in container["info"]:
-                    row_dict.update(
-                        {"Namespace": container["info"]["namespace"]})
+                    row_dict.update({"Namespace": container["info"]["namespace"]})
                 else:
                     row_dict.update({"Namespace": ""})
 
@@ -99,6 +100,8 @@ def etl_containers_csv(collections_filter, containers_csv_name):
 
                 csv_rows.append(row_dict)
 
+                incremental_id += 1
+
     write_data_to_csv(file_path, csv_rows, csv_fields, new_file=True)
 
 
@@ -108,15 +111,13 @@ if __name__ == "__main__":
         json.loads(os.getenv("OPENSHIFT_COLLECTIONS_FILTER"))
     )
     OPENSHIFT_CONTAINERS_CSV_NAME = os.getenv("OPENSHIFT_CONTAINERS_CSV_NAME")
-    HOST_COLLECTIONS_FILTER = ", ".join(
-        json.loads(os.getenv("HOST_COLLECTIONS_FILTER"))
-    )
-    HOST_CONTAINERS_CSV_NAME = os.getenv("HOST_CONTAINERS_CSV_NAME")
-    TAS_COLLECTIONS_FILTER = ", ".join(
-        json.loads(os.getenv("TAS_COLLECTIONS_FILTER")))
+    # HOST_COLLECTIONS_FILTER = ", ".join(
+    #     json.loads(os.getenv("HOST_COLLECTIONS_FILTER"))
+    # )
+    # HOST_CONTAINERS_CSV_NAME = os.getenv("HOST_CONTAINERS_CSV_NAME")
+    TAS_COLLECTIONS_FILTER = ", ".join(json.loads(os.getenv("TAS_COLLECTIONS_FILTER")))
     TAS_CONTAINERS_CSV_NAME = os.getenv("TAS_CONTAINERS_CSV_NAME")
 
-    etl_containers_csv(OPENSHIFT_COLLECTIONS_FILTER,
-                       OPENSHIFT_CONTAINERS_CSV_NAME)
-    etl_containers_csv(HOST_COLLECTIONS_FILTER, HOST_CONTAINERS_CSV_NAME)
+    etl_containers_csv(OPENSHIFT_COLLECTIONS_FILTER, OPENSHIFT_CONTAINERS_CSV_NAME)
+    # etl_containers_csv(HOST_COLLECTIONS_FILTER, HOST_CONTAINERS_CSV_NAME)
     etl_containers_csv(TAS_COLLECTIONS_FILTER, TAS_CONTAINERS_CSV_NAME)

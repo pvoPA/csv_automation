@@ -31,7 +31,7 @@ def etl_applications_csv() -> None:
     file_path = f"CSVs/{applications_csv_name}_{todays_date}.csv"
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
-    csv_fields = ["Container_ID", "App_ID", "Owner"]
+    csv_fields = ["Incremental_ID", "Container_ID", "App_ID", "Owner"]
 
     ###########################################################################
     # Get containers from Prisma
@@ -55,11 +55,9 @@ def etl_applications_csv() -> None:
 
             offset += LIMIT
         elif status_code == 401:
-            logger.error(
-                "Prisma token timed out, generating a new one and continuing.")
+            logger.error("Prisma token timed out, generating a new one and continuing.")
 
-            prisma_token = generate_prisma_token(
-                prisma_access_key, prisma_secret_key)
+            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
         else:
             logger.error("API returned %s.", status_code)
 
@@ -67,6 +65,7 @@ def etl_applications_csv() -> None:
     # Transform and grab fields of interest
 
     csv_rows = list()
+    incremental_id = 0
 
     if containers_data:
         for container in containers_data:
@@ -117,6 +116,7 @@ def etl_applications_csv() -> None:
             # Create rows for CSV
 
             row_dict = {
+                "Incremental_ID": incremental_id,
                 "Container_ID": CONTAINER_ID,
                 "App_ID": APP_ID,
                 "Owner": OWNER,
@@ -124,9 +124,9 @@ def etl_applications_csv() -> None:
 
             csv_rows.append(row_dict)
 
-    field_names = [key for key in csv_rows[0].keys()]
+            incremental_id += 1
 
-    write_data_to_csv(file_path, csv_rows, field_names, new_file=True)
+    write_data_to_csv(file_path, csv_rows, csv_fields, new_file=True)
 
 
 if __name__ == "__main__":

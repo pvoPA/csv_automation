@@ -113,7 +113,7 @@ def prisma_get_tanzu_blob_store_scan_results(
 
 
 def prisma_get_host_scan_results(
-    token: str, offset: int, limit: int
+    token: str, offset: int, limit: int, collection=""
 ) -> Tuple[list, int]:
     """
     Retrieves all host scan reports.
@@ -131,6 +131,9 @@ def prisma_get_host_scan_results(
     endpoint = (
         f"https://{cwp_endpoint}/api/v1/hosts?offset={str(offset)}&limit={str(limit)}"
     )
+
+    if collection:
+        endpoint += f"&collections={collection}"
 
     logger.info("Getting host scan results from Prisma using endpoint: %s", endpoint)
 
