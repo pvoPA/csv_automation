@@ -11,7 +11,7 @@ The function requires the following environment variables:
     - api_endpoint: The endpoint for the Prisma Cloud API.
     - access_key: The access key for the Prisma Cloud API.
     - secret_key: The secret key for the Prisma Cloud API.
-    - csv_file_path: The path where the CSV file will be saved.
+    - csv_blob_name: The path where the CSV file will be saved.
 
 Usage:
     Please refer to the README.md for instructions on
@@ -22,23 +22,34 @@ Returns:
 """
 import os
 import json
-import logging as logger
+import csv
+import logging
 import datetime as dt
 import azure.functions as func
+from io import StringIO
+from azure.core import exceptions
+from azure.storage.blob import BlobServiceClient
 from helpers import generate_prisma_token
-from helpers import write_data_to_csv
 from helpers import prisma_get_containers_scan_results
 from helpers import prisma_get_host_scan_results
 from helpers import prisma_get_images_scan_results
 from helpers import prisma_get_registry_image_scan_results
 from helpers import prisma_get_tanzu_blob_store_scan_results
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
 function_app = func.FunctionApp()
 
+CRON_SCHEDULE = os.getenv("CRON_SCHEDULE")
 
-@function_app.function_name(name="export_openshift_applications_csv")
-@app.route(route="export_openshift_applications_csv")
-def export_openshift_applications_csv(req: func.HttpRequest):
+
+@function_app.function_name(name="export_openshift_applications_csv_timer_trigger")
+@function_app.schedule(
+    schedule=CRON_SCHEDULE, arg_name="timer", run_on_startup=False, use_monitor=True
+)
+def export_openshift_applications_csv_timer_trigger(timer: func.TimerRequest):
     """
     Gets container data from Prisma and transforms to create application relevant data.
 
@@ -50,19 +61,35 @@ def export_openshift_applications_csv(req: func.HttpRequest):
 
     """
     todays_date = str(dt.datetime.today()).split()[0]
-    applications_csv_name = os.getenv("APPLICATIONS_CSV_NAME")
+    applications_csv_name = os.getenv("OPENSHIFT_APPLICATIONS_CSV_NAME")
     COLLECTIONS_FILTER = ", ".join(
         json.loads(os.getenv("OPENSHIFT_COLLECTIONS_FILTER"))
     )
     APPLICATION_ID_KEY = os.getenv("APP_ID_KEY")
     OWNER_ID_KEY = os.getenv("OWNER_ID_KEY")
+    blob_store_connection_string = os.getenv("AzureWebJobsStorage")
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
 
-    file_path = f"CSVs/{applications_csv_name}_{todays_date}.csv"
+    blob_name = f"CSVs/{applications_csv_name}_{todays_date}.csv"
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
     csv_fields = ["Incremental_ID", "Container_ID", "App_ID", "Owner"]
+
+    ###########################################################################
+    # Initialize blob store client
+
+    blob_service_client = BlobServiceClient.from_connection_string(
+        blob_store_connection_string
+    )
+
+    container_name = os.getenv("STORAGE_ACCOUNT_CONTAINER_NAME")
+    try:
+        container_client = blob_service_client.get_container_client(container_name)
+    except exceptions.ResourceNotFoundError:
+        container_client = blob_service_client.create_container(container_name)
+
+    blob_client = container_client.get_blob_client(blob_name)
 
     ###########################################################################
     # Get containers from Prisma
@@ -157,14 +184,24 @@ def export_openshift_applications_csv(req: func.HttpRequest):
 
             incremental_id += 1
 
-    write_data_to_csv(file_path, csv_rows, csv_fields, new_file=True)
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+    try:
+        container_client.delete_blob(blob_name)
+    except exceptions.ResourceNotFoundError:
+        pass
 
-    return func.HttpResponse("This HTTP triggered function executed successfully.")
+    if csv_rows:
+        write_csv_to_blob(blob_name, csv_rows, csv_fields, blob_client, new_file=True)
+    else:
+        logger.info("No data to write to CSV, it will not be created.")
 
 
-@function_app.function_name(name="export_openshift_containers_csv")
-@app.route(route="export_openshift_containers_csv")
-def export_openshift_containers_csv(req: func.HttpRequest):
+@function_app.function_name(name="export_openshift_containers_csv_timer_trigger")
+@function_app.schedule(
+    schedule=CRON_SCHEDULE, arg_name="timer", run_on_startup=False, use_monitor=True
+)
+def export_openshift_containers_csv(timer: func.TimerRequest):
     """
     Gets container data from Prisma and transforms for CSV friendly data.
 
@@ -191,11 +228,26 @@ def export_openshift_containers_csv(req: func.HttpRequest):
         "Image_ID",
     ]
     todays_date = str(dt.datetime.today()).split()[0]
+    blob_store_connection_string = os.getenv("AzureWebJobsStorage")
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
 
-    file_path = f"CSVs/{containers_csv_name}_{todays_date}.csv"
+    blob_name = f"CSVs/{containers_csv_name}_{todays_date}.csv"
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+
+    ###########################################################################
+    # Initialize blob store client
+
+    blob_service_client = BlobServiceClient.from_connection_string(
+        blob_store_connection_string
+    )
+
+    container_name = os.getenv("STORAGE_ACCOUNT_CONTAINER_NAME")
+    try:
+        container_client = blob_service_client.get_container_client(container_name)
+    except exceptions.ResourceNotFoundError:
+        container_client = blob_service_client.create_container(container_name)
+    blob_client = container_client.get_blob_client(blob_name)
 
     ##########################################################################
     # Grab containers data from Prisma
@@ -262,14 +314,26 @@ def export_openshift_containers_csv(req: func.HttpRequest):
 
                 incremental_id += 1
 
-    write_data_to_csv(file_path, csv_rows, csv_fields, new_file=True)
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+    try:
+        container_client.delete_blob(blob_name)
+    except exceptions.ResourceNotFoundError:
+        pass
 
-    return func.HttpResponse("This HTTP triggered function executed successfully.")
+    if csv_rows:
+        write_csv_to_blob(blob_name, csv_rows, csv_fields, blob_client, new_file=True)
+    else:
+        logger.info("No data to write to CSV, it will not be created.")
 
 
-@function_app.function_name(name="export_openshift_image_vulnerability_csv")
-@app.route(route="export_openshift_image_vulnerability_csv")
-def export_openshift_image_vulnerability_csv(req: func.HttpRequest):
+@function_app.function_name(
+    name="export_openshift_image_vulnerability_csv_timer_trigger"
+)
+@function_app.schedule(
+    schedule=CRON_SCHEDULE, arg_name="timer", run_on_startup=False, use_monitor=True
+)
+def export_openshift_image_vulnerability_csv(timer: func.TimerRequest):
     """
     Gets container and image data from Prisma and transforms to
         create image vulnerability relevant data.
@@ -286,6 +350,7 @@ def export_openshift_image_vulnerability_csv(req: func.HttpRequest):
     COLLECTIONS_FILTER = ", ".join(
         json.loads(os.getenv("OPENSHIFT_COLLECTIONS_FILTER"))
     )
+    blob_store_connection_string = os.getenv("AzureWebJobsStorage")
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
     csv_fields = [
@@ -300,7 +365,8 @@ def export_openshift_image_vulnerability_csv(req: func.HttpRequest):
         "Package_Path",
         "Time_Discovered",
     ]
-    file_path = f"CSVs/{IMAGE_VULNERABILITY_CSV_NAME}_{todays_date}.csv"
+
+    blob_name = f"CSVs/{IMAGE_VULNERABILITY_CSV_NAME}_{todays_date}.csv"
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
     ###########################################################################
@@ -329,6 +395,20 @@ def export_openshift_image_vulnerability_csv(req: func.HttpRequest):
             prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
         else:
             logger.error("API returned %s.", status_code)
+
+    ###########################################################################
+    # Initialize blob store client
+
+    blob_service_client = BlobServiceClient.from_connection_string(
+        blob_store_connection_string
+    )
+
+    container_name = os.getenv("STORAGE_ACCOUNT_CONTAINER_NAME")
+    try:
+        container_client = blob_service_client.get_container_client(container_name)
+    except exceptions.ResourceNotFoundError:
+        container_client = blob_service_client.create_container(container_name)
+    blob_client = container_client.get_blob_client(blob_name)
 
     ###########################################################################
     # Get images from Prisma to extract vulnerabilities
@@ -471,114 +551,24 @@ def export_openshift_image_vulnerability_csv(req: func.HttpRequest):
 
                     incremental_id += 1
 
-    write_data_to_csv(file_path, csv_rows, csv_fields, new_file=True)
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+    try:
+        container_client.delete_blob(blob_name)
+    except exceptions.ResourceNotFoundError:
+        pass
 
-    return func.HttpResponse("This HTTP triggered function executed successfully.")
-
-
-# @function_app.function_name(name="export_host_containers_csv")
-# @function_app.schedule(
-#     arg_name="timer",
-#     schedule=openshift_applications_csv_cron_schedule,
-#     run_on_startup=False,
-#     use_monitor=True,
-# )
-# def export_host_containers_csv(req: func.HttpRequest):
-#     """
-#     Gets container data from Prisma and transforms for CSV friendly data.
-
-#     Parameters:
-#         None
-
-#     Returns:
-#         None
-
-#     """
-#     containers_csv_name = os.getenv("HOST_CONTAINERS_CSV_NAME")
-#     collections_filter = ", ".join(json.loads(os.getenv("HOST_COLLECTIONS_FILTER")))
-#     csv_fields = [
-#         "Namespace",
-#         "Container_Name",
-#         "Host_Name",
-#         "Collection",
-#         "Container_ID",
-#         "Account_ID",
-#         "Cluster",
-#         "Image_ID",
-#     ]
-#     todays_date = str(dt.datetime.today()).split()[0]
-#     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
-#     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
-
-#     file_path = f"CSVs/{containers_csv_name}_{todays_date}.csv"
-#     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
-
-#     ##########################################################################
-#     # Grab containers data from Prisma
-
-#     end_of_page = False
-#     offset = 0
-#     LIMIT = 50
-
-#     containers_data = list()
-
-#     while not end_of_page:
-#         containers_response, status_code = prisma_get_containers_scan_results(
-#             prisma_token, offset=offset, limit=LIMIT, collection=collections_filter
-#         )
-
-#         if status_code == 200:
-#             if containers_response:
-#                 containers_data += [container for container in containers_response]
-#             else:
-#                 end_of_page = True
-
-#             offset += LIMIT
-#         elif status_code == 401:
-#             logger.error("Prisma token timed out, generating a new one and continuing.")
-
-#             prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
-#         else:
-#             logger.error("API returned %s.", status_code)
-
-#     csv_rows = list()
-
-#     ###########################################################################
-#     # Transform and grab fields of interest
-
-#     if containers_data:
-#         for container in containers_data:
-#             # Constant fields
-#             # Key = CSV Column Name, Value = JSON field
-#             for collection in container["collections"]:
-#                 row_dict = {
-#                     "Container_ID": container["info"]["id"],
-#                     "Container_Name": container["info"]["name"],
-#                     "Image_ID": container["info"]["imageID"],
-#                     "Host_Name": container["hostname"],
-#                     "Account_ID": container["info"]["cloudMetadata"]["accountID"],
-#                     "Collection": collection,
-#                 }
-
-#                 # Variable fields
-#                 if "namespace" in container["info"]:
-#                     row_dict.update({"Namespace": container["info"]["namespace"]})
-#                 else:
-#                     row_dict.update({"Namespace": ""})
-
-#                 if "cluster" in container["info"]:
-#                     row_dict.update({"Cluster": container["info"]["cluster"]})
-#                 else:
-#                     row_dict.update({"Cluster": ""})
-
-#                 csv_rows.append(row_dict)
-
-#     write_data_to_csv(file_path, csv_rows, csv_fields, new_file=True)
+    if csv_rows:
+        write_csv_to_blob(blob_name, csv_rows, csv_fields, blob_client, new_file=True)
+    else:
+        logger.info("No data to write to CSV, it will not be created.")
 
 
-@function_app.function_name(name="export_host_applications_csv")
-@app.route(route="export_host_applications_csv")
-def export_host_applications_csv(req: func.HttpRequest):
+@function_app.function_name(name="export_host_applications_csv_timer_trigger")
+@function_app.schedule(
+    schedule=CRON_SCHEDULE, arg_name="timer", run_on_startup=False, use_monitor=True
+)
+def export_host_applications_csv(timer: func.TimerRequest):
     """
     Gets host data from Prisma and clean up for exporting to applications CSV.
 
@@ -590,79 +580,42 @@ def export_host_applications_csv(req: func.HttpRequest):
 
     """
     todays_date = str(dt.datetime.today()).split()[0]
-    COLLECTIONS_FILTER = ", ".join(json.loads(os.getenv("HOST_COLLECTIONS_FILTER")))
     host_application_csv_name = os.getenv("HOST_APPLICATION_CSV_NAME")
     host_application_fields_of_interest = json.loads(
         os.getenv("HOST_APPLICATION_FIELDS_OF_INTEREST")
     )
-    file_path = f"CSVs/{host_application_csv_name}_{todays_date}.csv"
+    blob_name = f"CSVs/{host_application_csv_name}_{todays_date}.csv"
+    blob_store_connection_string = os.getenv("AzureWebJobsStorage")
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
     external_labels_to_include = json.loads(
         os.getenv("HOST_EXTERNAL_LABELS_TO_INCLUDE")
     )
-    host_application_fields = [
-        "Incremental_ID",
-        "repoTag",
-        "firewallProtection",
-        "history",
-        "creationTime",
-        "packageManager",
-        "complianceIssuesCount",
-        "collections",
-        "pushTime",
-        "scanBuildDate",
-        "osDistro",
-        "labels",
-        "scanVersion",
-        "hostDevices",
-        "err",
-        "packageCorrelationDone",
-        "scanID",
-        "firstScanTime",
-        "complianceDistribution",
-        "startupBinaries",
-        "vulnerabilityRiskScore",
-        "image",
-        "agentless",
-        "tags",
-        "appEmbedded",
-        "wildFireUsage",
-        "trustStatus",
-        "hosts",
-        "Secrets",
-        "vulnerabilitiesCount",
-        "type",
-        "riskFactors",
-        "osDistroRelease",
-        "applications",
-        "isARM64",
-        "distro",
-        "vulnerabilityDistribution",
-        "complianceRiskScore",
-        "allCompliance",
-        "binaries",
-        "instances",
-        "files",
-        "installedProducts",
-        "scanTime",
-        "complianceIssues",
-        "cloudMetadata",
-        "hostname",
-        "_id",
-        "packages",
-        "osDistroVersion",
-        "repoDigests",
-        "externalLabels",
-        "rhelRepos",
-        "clusters",
-        "k8sClusterAddr",
-        "stopped",
-        "ecsClusterName",
-    ]
+    host_application_fields = json.loads(os.getenv("HOST_APPLICATION_CSV_COLUMNS"))
 
     for external_label in external_labels_to_include:
         host_application_fields.append(external_label)
+
+    ###########################################################################
+    # Initialize blob store client
+
+    blob_service_client = BlobServiceClient.from_connection_string(
+        blob_store_connection_string
+    )
+
+    container_name = os.getenv("STORAGE_ACCOUNT_CONTAINER_NAME")
+    try:
+        container_client = blob_service_client.get_container_client(container_name)
+    except exceptions.ResourceNotFoundError:
+        container_client = blob_service_client.create_container(container_name)
+    blob_client = container_client.get_blob_client(blob_name)
+
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+    try:
+        container_client.delete_blob(blob_name)
+    except exceptions.ResourceNotFoundError:
+        pass
 
     ###########################################################################
     # Generate Prisma Token
@@ -670,27 +623,17 @@ def export_host_applications_csv(req: func.HttpRequest):
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
     ###########################################################################
-    # Delete the CSV file if it exists from a previous run
-
-    try:
-        os.remove(file_path)
-    except FileNotFoundError:
-        pass
-
-    ###########################################################################
     # Get hosts from Prisma
 
     end_of_page = False
-    new_file = True
     offset = 0
     incremental_id = 0
     page_limit = 50
+    host_list = list()
 
     while not end_of_page:
-        host_list = list()
-
         host_response, status_code = prisma_get_host_scan_results(
-            prisma_token, offset=offset, limit=page_limit, collection=COLLECTIONS_FILTER
+            prisma_token, offset=offset, limit=page_limit
         )
 
         if status_code == 200:
@@ -724,10 +667,6 @@ def export_host_applications_csv(req: func.HttpRequest):
 
                 ##############################################################
                 # Write to CSV
-                write_data_to_csv(
-                    file_path, host_list, host_application_fields, new_file
-                )
-                new_file = False
 
                 offset += page_limit
             else:
@@ -740,12 +679,19 @@ def export_host_applications_csv(req: func.HttpRequest):
         else:
             logger.error("API returned %s.", status_code)
 
-    return func.HttpResponse("This HTTP triggered function executed successfully.")
+    if host_list:
+        write_csv_to_blob(
+            blob_name, host_list, host_application_fields, blob_client, new_file=True
+        )
+    else:
+        logger.info("No data to write to CSV, it will not be created.")
 
 
-@function_app.function_name(name="export_host_vulnerability_csv")
-@app.route(route="export_host_vulnerability_csv")
-def export_host_vulnerability_csv(req: func.HttpRequest):
+@function_app.function_name(name="export_host_vulnerability_csv_timer_trigger")
+@function_app.schedule(
+    schedule=CRON_SCHEDULE, arg_name="timer", run_on_startup=False, use_monitor=True
+)
+def export_host_vulnerability_csv(timer: func.TimerRequest):
     """
     Gets host vulnerability data from Prisma and cleans up for exporting to CSV.
 
@@ -757,97 +703,36 @@ def export_host_vulnerability_csv(req: func.HttpRequest):
 
     """
     todays_date = str(dt.datetime.today()).split()[0]
-    COLLECTIONS_FILTER = ", ".join(json.loads(os.getenv("HOST_COLLECTIONS_FILTER")))
     host_vulnerability_csv_name = os.getenv("HOST_VULNERABILITY_CSV_NAME")
     host_vulnerability_fields_of_interest = json.loads(
         os.getenv("HOST_VULNERABILITY_FIELDS_OF_INTEREST")
     )
-    file_path = f"CSVs/{host_vulnerability_csv_name}_{todays_date}.csv"
+    blob_name = f"CSVs/{host_vulnerability_csv_name}_{todays_date}.csv"
+    blob_store_connection_string = os.getenv("AzureWebJobsStorage")
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
-    host_vulnerability_fields = [
-        "Incremental_ID",
-        "Resource_ID",
-        "_id",
-        "type",
-        "hostname",
-        "scanTime",
-        "binaries",
-        "Secrets",
-        "startupBinaries",
-        "osDistro",
-        "osDistroVersion",
-        "osDistroRelease",
-        "distro",
-        "packages",
-        "files",
-        "packageManager",
-        "applications",
-        "isARM64",
-        "packageCorrelationDone",
-        "image",
-        "history",
-        "complianceIssues",
-        "allCompliance",
-        "repoTag",
-        "tags",
-        "repoDigests",
-        "creationTime",
-        "pushTime",
-        "vulnerabilitiesCount",
-        "complianceIssuesCount",
-        "vulnerabilityDistribution",
-        "complianceDistribution",
-        "vulnerabilityRiskScore",
-        "complianceRiskScore",
-        "k8sClusterAddr",
-        "riskFactors",
-        "labels",
-        "installedProducts",
-        "scanVersion",
-        "scanBuildDate",
-        "hostDevices",
-        "firstScanTime",
-        "cloudMetadata",
-        "clusters",
-        "instances",
-        "hosts",
-        "err",
-        "collections",
-        "scanID",
-        "trustStatus",
-        "firewallProtection",
-        "appEmbedded",
-        "wildFireUsage",
-        "agentless",
-        "text",
-        "id",
-        "severity",
-        "cvss",
-        "status",
-        "cve",
-        "cause",
-        "description",
-        "title",
-        "vecStr",
-        "exploit",
-        "link",
-        "packageName",
-        "packageVersion",
-        "layerTime",
-        "templates",
-        "twistlock",
-        "cri",
-        "published",
-        "fixDate",
-        "applicableRules",
-        "discovered",
-        "binaryPkgs",
-        "vulnTagInfos",
-        "functionLayer",
-        "Package_Path",
-        "Incremental_ID",
-    ]
+    host_vulnerability_fields = json.loads(os.getenv("HOST_VULNERABILITY_CSV_COLUMNS"))
+
+    ###########################################################################
+    # Initialize blob store client
+
+    blob_service_client = BlobServiceClient.from_connection_string(
+        blob_store_connection_string
+    )
+
+    container_name = os.getenv("STORAGE_ACCOUNT_CONTAINER_NAME")
+    try:
+        container_client = blob_service_client.get_container_client(container_name)
+    except exceptions.ResourceNotFoundError:
+        container_client = blob_service_client.create_container(container_name)
+    blob_client = container_client.get_blob_client(blob_name)
+
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+    try:
+        container_client.delete_blob(blob_name)
+    except exceptions.ResourceNotFoundError:
+        pass
 
     ###########################################################################
     # Generate Prisma Token
@@ -855,27 +740,17 @@ def export_host_vulnerability_csv(req: func.HttpRequest):
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
     ###########################################################################
-    # Delete the CSV file if it exists from a previous run
-
-    try:
-        os.remove(file_path)
-    except FileNotFoundError:
-        pass
-
-    ###########################################################################
     # Get hosts from Prisma
 
     end_of_page = False
-    new_file = True
     offset = 0
     incremental_id = 0
     page_limit = 50
+    vulnerability_list = list()
 
     while not end_of_page:
-        vulnerability_list = list()
-
         host_response, status_code = prisma_get_host_scan_results(
-            prisma_token, offset=offset, limit=page_limit, collection=COLLECTIONS_FILTER
+            prisma_token, offset=offset, limit=page_limit
         )
 
         if status_code == 200:
@@ -957,13 +832,6 @@ def export_host_vulnerability_csv(req: func.HttpRequest):
 
                                 incremental_id += 1
 
-                ##############################################################
-                # Write to CSV
-                write_data_to_csv(
-                    file_path, vulnerability_list, host_vulnerability_fields, new_file
-                )
-                new_file = False
-
                 offset += page_limit
             else:
                 end_of_page = True
@@ -975,12 +843,25 @@ def export_host_vulnerability_csv(req: func.HttpRequest):
         else:
             logger.error("API returned %s.", status_code)
 
-    return func.HttpResponse("This HTTP triggered function executed successfully.")
+    ##############################################################
+    # Write to CSV
+    if vulnerability_list:
+        write_csv_to_blob(
+            blob_name,
+            vulnerability_list,
+            host_vulnerability_fields,
+            blob_client,
+            new_file=True,
+        )
+    else:
+        logger.info("No data to write to CSV, it will not be created.")
 
 
-@function_app.function_name(name="export_tas_containers_csv")
-@app.route(route="export_tas_containers_csv")
-def export_tas_containers_csv(req: func.HttpRequest):
+@function_app.function_name(name="export_tas_containers_csv_timer_trigger")
+@function_app.schedule(
+    schedule=CRON_SCHEDULE, arg_name="timer", run_on_startup=False, use_monitor=True
+)
+def export_tas_containers_csv(timer: func.TimerRequest):
     """
     Gets container data from Prisma and transforms for CSV friendly data.
 
@@ -1009,8 +890,23 @@ def export_tas_containers_csv(req: func.HttpRequest):
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
 
-    file_path = f"CSVs/{containers_csv_name}_{todays_date}.csv"
+    blob_name = f"CSVs/{containers_csv_name}_{todays_date}.csv"
+    blob_store_connection_string = os.getenv("AzureWebJobsStorage")
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+
+    ###########################################################################
+    # Initialize blob store client
+
+    blob_service_client = BlobServiceClient.from_connection_string(
+        blob_store_connection_string
+    )
+
+    container_name = os.getenv("STORAGE_ACCOUNT_CONTAINER_NAME")
+    try:
+        container_client = blob_service_client.get_container_client(container_name)
+    except exceptions.ResourceNotFoundError:
+        container_client = blob_service_client.create_container(container_name)
+    blob_client = container_client.get_blob_client(blob_name)
 
     ##########################################################################
     # Grab containers data from Prisma
@@ -1077,14 +973,24 @@ def export_tas_containers_csv(req: func.HttpRequest):
 
                 incremental_id += 1
 
-    write_data_to_csv(file_path, csv_rows, csv_fields, new_file=True)
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+    try:
+        container_client.delete_blob(blob_name)
+    except exceptions.ResourceNotFoundError:
+        pass
 
-    return func.HttpResponse("This HTTP triggered function executed successfully.")
+    if csv_rows:
+        write_csv_to_blob(blob_name, csv_rows, csv_fields, blob_client, new_file=True)
+    else:
+        logger.info("No data to write to CSV, it will not be created.")
 
 
-@function_app.function_name(name="export_tas_vulnerability_csv")
-@app.route(route="export_tas_vulnerability_csv")
-def export_tas_vulnerability_csv(req: func.HttpRequest):
+@function_app.function_name(name="export_tas_vulnerability_csv_timer_trigger")
+@function_app.schedule(
+    schedule=CRON_SCHEDULE, arg_name="timer", run_on_startup=False, use_monitor=True
+)
+def export_tas_vulnerability_csv(timer: func.TimerRequest):
     """
     Gets tanzu application service data from Prisma and export to CSV.
 
@@ -1102,104 +1008,37 @@ def export_tas_vulnerability_csv(req: func.HttpRequest):
         os.getenv("TAS_VULNERABILITY_FIELDS_OF_INTEREST")
     )
 
-    file_path = f"CSVs/{tas_blobstore_vulnerability_csv_name}_{todays_date}.csv"
+    blob_name = f"CSVs/{tas_blobstore_vulnerability_csv_name}_{todays_date}.csv"
+    blob_store_connection_string = os.getenv("AzureWebJobsStorage")
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
     external_labels_to_include = json.loads(os.getenv("TAS_EXTERNAL_LABELS_TO_INCLUDE"))
 
-    tas_csv_fields = [
-        "Incremental_ID",
-        "labels",
-        "type",
-        "appEmbedded",
-        "description",
-        "firewallProtection",
-        "clusters",
-        "hostname",
-        "scanVersion",
-        "tags",
-        "scanBuildDate",
-        "Secrets",
-        "binaries",
-        "packageCorrelationDone",
-        "layerTime",
-        "scanTime",
-        "wildFireUsage",
-        "twistlock",
-        "packages",
-        "published",
-        "_id",
-        "complianceIssues",
-        "distro",
-        "text",
-        "repoDigests",
-        "hosts",
-        "scanID",
-        "vulnerabilitiesCount",
-        "packageName",
-        "isARM64",
-        "id",
-        "allCompliance",
-        "status",
-        "err",
-        "severity",
-        "cri",
-        "functionLayer",
-        "osDistro",
-        "osDistroRelease",
-        "creationTime",
-        "cloudMetadata",
-        "layers",
-        "collections",
-        "cause",
-        "topLayer",
-        "packageVersion",
-        "exploit",
-        "applicableRules",
-        "trustStatus",
-        "vulnerabilityRiskScore",
-        "repoTag",
-        "vulnerabilityDistribution",
-        "vecStr",
-        "instances",
-        "title",
-        "complianceDistribution",
-        "firstScanTime",
-        "cvss",
-        "startupBinaries",
-        "image",
-        "link",
-        "riskFactors",
-        "pushTime",
-        "complianceRiskScore",
-        "files",
-        "history",
-        "agentless",
-        "installedProducts",
-        "complianceIssuesCount",
-        "cve",
-        "templates",
-        "fixDate",
-        "discovered",
-        "osDistroVersion",
-        "packageManager",
-        "binaryPkgs",
-        "exploits",
-        "applications",
-        "vulnTagInfos",
-        "missingDistroVulnCoverage",
-        "namespaces",
-        "externalLabels",
-        "rhelRepos",
-        "gracePeriodDays",
-        "block",
-        "twistlockImage",
-        "Package_Path",
-        "Incremental_ID",
-    ]
+    tas_csv_fields = json.loads(os.getenv("TAS_VULNERABILITY_CSV_COLUMNS"))
 
     for external_label in external_labels_to_include:
         tas_csv_fields.append(external_label)
+
+    ###########################################################################
+    # Initialize blob store client
+
+    blob_service_client = BlobServiceClient.from_connection_string(
+        blob_store_connection_string
+    )
+
+    container_name = os.getenv("STORAGE_ACCOUNT_CONTAINER_NAME")
+    try:
+        container_client = blob_service_client.get_container_client(container_name)
+    except exceptions.ResourceNotFoundError:
+        container_client = blob_service_client.create_container(container_name)
+    blob_client = container_client.get_blob_client(blob_name)
+
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+    try:
+        container_client.delete_blob(blob_name)
+    except exceptions.ResourceNotFoundError:
+        pass
 
     ###########################################################################
     # Generate Prisma Token
@@ -1207,18 +1046,9 @@ def export_tas_vulnerability_csv(req: func.HttpRequest):
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
     ###########################################################################
-    # Delete the CSV file if it exists from a previous run
-
-    try:
-        os.remove(file_path)
-    except FileNotFoundError:
-        pass
-
-    ###########################################################################
     # Get images from Prisma and write to CSV
 
     end_of_page = False
-    new_file = True
     offset = 0
     page_limit = 50
     tas_vulnerability_dict = dict()
@@ -1326,13 +1156,6 @@ def export_tas_vulnerability_csv(req: func.HttpRequest):
                                         {tas["_id"]: [vulnerability_dict]}
                                     )
 
-                ###############################################################
-                # Write to CSV
-                # write_data_to_csv(
-                #     file_path, vulnerability_list, tas_csv_fields, new_file
-                # )
-                # new_file = False
-
                 offset += page_limit
             else:
                 end_of_page = True
@@ -1351,7 +1174,7 @@ def export_tas_vulnerability_csv(req: func.HttpRequest):
     offset = 0
     LIMIT = 50
     incremental_id = 0
-    new_file = True
+    csv_rows = list()
 
     while not end_of_page:
         containers_response, status_code = prisma_get_containers_scan_results(
@@ -1359,8 +1182,6 @@ def export_tas_vulnerability_csv(req: func.HttpRequest):
         )
         if status_code == 200:
             if containers_response:
-                csv_rows = list()
-
                 for container in containers_response:
                     IMAGE_ID = container["info"]["imageID"]
                     if IMAGE_ID in tas_vulnerability_dict:
@@ -1374,8 +1195,6 @@ def export_tas_vulnerability_csv(req: func.HttpRequest):
                         # remove the image ID as it's already been added to the CSV
                         tas_vulnerability_dict.pop(IMAGE_ID)
 
-                write_data_to_csv(file_path, csv_rows, tas_csv_fields, new_file)
-                new_file = False
             else:
                 end_of_page = True
 
@@ -1387,12 +1206,19 @@ def export_tas_vulnerability_csv(req: func.HttpRequest):
         else:
             logger.error("API returned %s.", status_code)
 
-    return func.HttpResponse("This HTTP triggered function executed successfully.")
+    if csv_rows:
+        write_csv_to_blob(
+            blob_name, csv_rows, tas_csv_fields, blob_client, new_file=True
+        )
+    else:
+        logger.info("No data to write to CSV, it will not be created.")
 
 
-@function_app.function_name(name="export_tas_application_csv")
-@app.route(route="export_tas_application_csv")
-def export_tas_application_csv(req: func.HttpRequest):
+@function_app.function_name(name="export_tas_application_csv_timer_trigger")
+@function_app.schedule(
+    schedule=CRON_SCHEDULE, arg_name="timer", run_on_startup=False, use_monitor=True
+)
+def export_tas_application_csv(timer: func.TimerRequest):
     """
     Gets tanzu application service data from Prisma and export to CSV.
 
@@ -1410,66 +1236,37 @@ def export_tas_application_csv(req: func.HttpRequest):
         os.getenv("TAS_APPLICATION_FIELDS_OF_INTEREST")
     )
 
-    file_path = f"CSVs/{tas_blobstore_application_csv_name}_{todays_date}.csv"
+    blob_name = f"CSVs/{tas_blobstore_application_csv_name}_{todays_date}.csv"
+    blob_store_connection_string = os.getenv("AzureWebJobsStorage")
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
     external_labels_to_include = json.loads(os.getenv("TAS_EXTERNAL_LABELS_TO_INCLUDE"))
 
-    tas_csv_fields = [
-        "Incremental_ID",
-        "osDistroVersion",
-        "packageCorrelationDone",
-        "complianceIssues",
-        "pushTime",
-        "applications",
-        "isARM64",
-        "hosts",
-        "_id",
-        "id",
-        "startupBinaries",
-        "repoTag",
-        "appEmbedded",
-        "vulnerabilitiesCount",
-        "installedProducts",
-        "osDistro",
-        "scanID",
-        "err",
-        "scanVersion",
-        "collections",
-        "allCompliance",
-        "firstScanTime",
-        "vulnerabilityDistribution",
-        "firewallProtection",
-        "wildFireUsage",
-        "scanTime",
-        "tags",
-        "complianceDistribution",
-        "instances",
-        "osDistroRelease",
-        "packageManager",
-        "complianceIssuesCount",
-        "hostname",
-        "agentless",
-        "vulnerabilityRiskScore",
-        "type",
-        "complianceRiskScore",
-        "clusters",
-        "Secrets",
-        "image",
-        "cloudMetadata",
-        "trustStatus",
-        "distro",
-        "creationTime",
-        "repoDigests",
-        "binaries",
-        "packages",
-        "files",
-        "riskFactors",
-        "history",
-    ]
+    tas_csv_fields = json.loads(os.getenv("TAS_APPLICATION_CSV_COLUMNS"))
 
     for external_label in external_labels_to_include:
         tas_csv_fields.append(external_label)
+
+    ###########################################################################
+    # Initialize blob store client
+
+    blob_service_client = BlobServiceClient.from_connection_string(
+        blob_store_connection_string
+    )
+
+    container_name = os.getenv("STORAGE_ACCOUNT_CONTAINER_NAME")
+    try:
+        container_client = blob_service_client.get_container_client(container_name)
+    except exceptions.ResourceNotFoundError:
+        container_client = blob_service_client.create_container(container_name)
+    blob_client = container_client.get_blob_client(blob_name)
+
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+    try:
+        container_client.delete_blob(blob_name)
+    except exceptions.ResourceNotFoundError:
+        pass
 
     ###########################################################################
     # Generate Prisma Token
@@ -1477,18 +1274,9 @@ def export_tas_application_csv(req: func.HttpRequest):
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
     ###########################################################################
-    # Delete the CSV file if it exists from a previous run
-
-    try:
-        os.remove(file_path)
-    except FileNotFoundError:
-        pass
-
-    ###########################################################################
     # Get images from Prisma and write to CSV
 
     end_of_page = False
-    new_file = True
     offset = 0
     page_limit = 50
     tas_application_dict = dict()
@@ -1543,7 +1331,7 @@ def export_tas_application_csv(req: func.HttpRequest):
     offset = 0
     LIMIT = 50
     incremental_id = 0
-    new_file = True
+    csv_rows = list()
 
     while not end_of_page:
         containers_response, status_code = prisma_get_containers_scan_results(
@@ -1551,8 +1339,6 @@ def export_tas_application_csv(req: func.HttpRequest):
         )
         if status_code == 200:
             if containers_response:
-                csv_rows = list()
-
                 for container in containers_response:
                     IMAGE_ID = container["info"]["imageID"]
                     if IMAGE_ID in tas_application_dict:
@@ -1566,8 +1352,6 @@ def export_tas_application_csv(req: func.HttpRequest):
                         # remove the image ID as it's already been added to the CSV
                         tas_application_dict.pop(IMAGE_ID)
 
-                write_data_to_csv(file_path, csv_rows, tas_csv_fields, new_file)
-                new_file = False
             else:
                 end_of_page = True
 
@@ -1579,12 +1363,19 @@ def export_tas_application_csv(req: func.HttpRequest):
         else:
             logger.error("API returned %s.", status_code)
 
-    return func.HttpResponse("This HTTP triggered function executed successfully.")
+    if csv_rows:
+        write_csv_to_blob(
+            blob_name, csv_rows, tas_csv_fields, blob_client, new_file=True
+        )
+    else:
+        logger.info("No data to write to CSV, it will not be created.")
 
 
-@function_app.function_name(name="export_nexus_repo_application_csv")
-@app.route(route="export_nexus_repo_application_csv")
-def export_nexus_repo_application_csv(req: func.HttpRequest):
+@function_app.function_name(name="export_nexus_repo_application_csv_timer_trigger")
+@function_app.schedule(
+    schedule=CRON_SCHEDULE, arg_name="timer", run_on_startup=False, use_monitor=True
+)
+def export_nexus_repo_application_csv(timer: func.TimerRequest):
     """
     Gets registry image data from Prisma and export to CSV.
 
@@ -1602,68 +1393,37 @@ def export_nexus_repo_application_csv(req: func.HttpRequest):
     registry_image_blobstore_application_fields_of_interest = json.loads(
         os.getenv("REGISTRY_IMAGE_APPLICATION_FIELDS_OF_INTEREST")
     )
-    file_path = (
+    blob_name = (
         f"CSVs/{registry_image_blobstore_application_csv_name}_{todays_date}.csv"
     )
+    blob_store_connection_string = os.getenv("AzureWebJobsStorage")
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
 
-    registry_image_csv_fields = [
-        "Incremental_ID",
-        "pushTime",
-        "startupBinaries",
-        "history",
-        "vulnerabilitiesCount",
-        "wildFireUsage",
-        "osDistroVersion",
-        "isARM64",
-        "repoDigests",
-        "packageCorrelationDone",
-        "osDistro",
-        "repoTag",
-        "vulnerabilityRiskScore",
-        "installedProducts",
-        "files",
-        "hosts",
-        "firstScanTime",
-        "trustStatus",
-        "complianceIssuesCount",
-        "firewallProtection",
-        "complianceRiskScore",
-        "collections",
-        "Secrets",
-        "err",
-        "image",
-        "riskFactors",
-        "complianceIssues",
-        "cloudMetadata",
-        "allCompliance",
-        "scanTime",
-        "appEmbedded",
-        "creationTime",
-        "agentless",
-        "packages",
-        "_id",
-        "complianceDistribution",
-        "binaries",
-        "packageManager",
-        "tags",
-        "instances",
-        "osDistroRelease",
-        "vulnerabilityDistribution",
-        "resourceID",
-        "type",
-        "hostname",
-        "id",
-        "scanID",
-        "registryType",
-        "distro",
-        "topLayer",
-        "scanVersion",
-        "scanBuildDate",
-        "layers",
-        "applications",
-    ]
+    registry_image_csv_fields = json.loads(
+        os.getenv("REGISTRY_IMAGE_APPLICATION_CSV_COLUMNS")
+    )
+
+    ###########################################################################
+    # Initialize blob store client
+
+    blob_service_client = BlobServiceClient.from_connection_string(
+        blob_store_connection_string
+    )
+
+    container_name = os.getenv("STORAGE_ACCOUNT_CONTAINER_NAME")
+    try:
+        container_client = blob_service_client.get_container_client(container_name)
+    except exceptions.ResourceNotFoundError:
+        container_client = blob_service_client.create_container(container_name)
+    blob_client = container_client.get_blob_client(blob_name)
+
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+    try:
+        container_client.delete_blob(blob_name)
+    except exceptions.ResourceNotFoundError:
+        pass
 
     ###########################################################################
     # Generate Prisma Token
@@ -1671,25 +1431,15 @@ def export_nexus_repo_application_csv(req: func.HttpRequest):
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
     ###########################################################################
-    # Delete the CSV file if it exists from a previous run
-
-    try:
-        os.remove(file_path)
-    except FileNotFoundError:
-        pass
-
-    ###########################################################################
     # Get registry images from Prisma and write to CSV
 
     end_of_page = False
-    new_file = True
     offset = 0
     incremental_id = 0
     page_limit = 50
+    registry_image_list = list()
 
     while not end_of_page:
-        registry_image_list = list()
-
         (
             registry_image_response,
             status_code,
@@ -1728,13 +1478,6 @@ def export_nexus_repo_application_csv(req: func.HttpRequest):
 
                     incremental_id += 1
 
-                ##############################################################
-                # Write to CSV
-                write_data_to_csv(
-                    file_path, registry_image_list, registry_image_csv_fields, new_file
-                )
-                new_file = False
-
                 offset += page_limit
             else:
                 end_of_page = True
@@ -1744,12 +1487,25 @@ def export_nexus_repo_application_csv(req: func.HttpRequest):
 
             prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
-    return func.HttpResponse("This HTTP triggered function executed successfully.")
+    ##############################################################
+    # Write to CSV
+    if registry_image_list:
+        write_csv_to_blob(
+            blob_name,
+            registry_image_list,
+            registry_image_csv_fields,
+            blob_client,
+            new_file=True,
+        )
+    else:
+        logger.info("No data to write to CSV, it will not be created.")
 
 
-@function_app.function_name(name="export_nexus_repo_vulnerability_csv")
-@app.route(route="export_nexus_repo_vulnerability_csv")
-def export_nexus_repo_vulnerability_csv(req: func.HttpRequest):
+@function_app.function_name(name="export_nexus_repo_vulnerability_csv_timer_trigger")
+@function_app.schedule(
+    schedule=CRON_SCHEDULE, arg_name="timer", run_on_startup=False, use_monitor=True
+)
+def export_nexus_repo_vulnerability_csv(timer: func.TimerRequest):
     """
     Gets registry image data from Prisma and export to CSV.
 
@@ -1767,43 +1523,37 @@ def export_nexus_repo_vulnerability_csv(req: func.HttpRequest):
     registry_image_blobstore_vulnerability_fields_of_interest = json.loads(
         os.getenv("REGISTRY_IMAGE_VULNERABILITY_FIELDS_OF_INTEREST")
     )
-    file_path = (
+    blob_name = (
         f"CSVs/{registry_image_blobstore_vulnerability_csv_name}_{todays_date}.csv"
     )
+    blob_store_connection_string = os.getenv("AzureWebJobsStorage")
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
 
-    registry_image_csv_fields = [
-        "Incremental_ID",
-        "Resource_ID",
-        "riskFactors",
-        "twistlock",
-        "cri",
-        "cve",
-        "cvss",
-        "fixDate",
-        "published",
-        "description",
-        "resourceID",
-        "packageVersion",
-        "text",
-        "status",
-        "functionLayer",
-        "vecStr",
-        "layerTime",
-        "exploit",
-        "title",
-        "link",
-        "type",
-        "packageName",
-        "templates",
-        "applicableRules",
-        "discovered",
-        "id",
-        "binaryPkgs",
-        "severity",
-        "cause",
-    ]
+    registry_image_csv_fields = json.loads(
+        os.getenv("REGISTRY_IMAGE_VULNERABILITY_CSV_COLUMNS")
+    )
+
+    ###########################################################################
+    # Initialize blob store client
+
+    blob_service_client = BlobServiceClient.from_connection_string(
+        blob_store_connection_string
+    )
+
+    container_name = os.getenv("STORAGE_ACCOUNT_CONTAINER_NAME")
+    try:
+        container_client = blob_service_client.get_container_client(container_name)
+    except exceptions.ResourceNotFoundError:
+        container_client = blob_service_client.create_container(container_name)
+    blob_client = container_client.get_blob_client(blob_name)
+
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+    try:
+        container_client.delete_blob(blob_name)
+    except exceptions.ResourceNotFoundError:
+        pass
 
     ###########################################################################
     # Generate Prisma Token
@@ -1811,20 +1561,12 @@ def export_nexus_repo_vulnerability_csv(req: func.HttpRequest):
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
     ###########################################################################
-    # Delete the CSV file if it exists from a previous run
-
-    try:
-        os.remove(file_path)
-    except FileNotFoundError:
-        pass
-
-    ###########################################################################
     # Get registry images from Prisma and write to CSV
 
     end_of_page = False
-    new_file = True
     offset = 0
     page_limit = 50
+    repo_vulnerability_list = list()
 
     while not end_of_page:
         (
@@ -1871,13 +1613,9 @@ def export_nexus_repo_vulnerability_csv(req: func.HttpRequest):
                 for repo in repo_vulnerability_dict.items():
                     for vuln in repo_vulnerability_dict[repo[0]].items():
                         vuln[1].update({"Incremental_ID": incremental_id})
-                        write_data_to_csv(
-                            file_path,
-                            [vuln[1]],
-                            registry_image_csv_fields,
-                            new_file,
-                        )
-                        new_file = False
+
+                        repo_vulnerability_list.append(vuln[1])
+
                         incremental_id += 1
                 offset += page_limit
             else:
@@ -1888,12 +1626,23 @@ def export_nexus_repo_vulnerability_csv(req: func.HttpRequest):
 
             prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
-    return func.HttpResponse("This HTTP triggered function executed successfully.")
+    if repo_vulnerability_list:
+        write_csv_to_blob(
+            blob_name,
+            repo_vulnerability_list,
+            registry_image_csv_fields,
+            blob_client,
+            new_file=True,
+        )
+    else:
+        logger.info("No data to write to CSV, it will not be created.")
 
 
-@function_app.function_name(name="export_tanzu_blobstore_application_csv")
-@app.route(route="export_tanzu_blobstore_application_csv")
-def export_tanzu_blobstore_application_csv(req: func.HttpRequest):
+@function_app.function_name(name="export_tanzu_blobstore_application_csv_timer_trigger")
+@function_app.schedule(
+    schedule=CRON_SCHEDULE, arg_name="timer", run_on_startup=False, use_monitor=True
+)
+def export_tanzu_blobstore_application_csv(timer: func.TimerRequest):
     """
     Gets tanzu blobstore data from Prisma and cleans up for exporting to CSV.
 
@@ -1912,71 +1661,33 @@ def export_tanzu_blobstore_application_csv(req: func.HttpRequest):
     tanzu_blobstore_application_fields_of_interest = json.loads(
         os.getenv("TANZU_BLOBSTORE_APPLICATION_FIELDS_OF_INTEREST")
     )
-    file_path = f"CSVs/{tanzu_blobstore_application_csv_name}_{todays_date}.csv"
+    blob_name = f"CSVs/{tanzu_blobstore_application_csv_name}_{todays_date}.csv"
+    blob_store_connection_string = os.getenv("AzureWebJobsStorage")
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
 
-    tanzu_csv_fields = [
-        "Incremental_ID",
-        "packages",
-        "creationTime",
-        "name",
-        "osDistro",
-        "accountID",
-        "repoTag",
-        "complianceRiskScore",
-        "repoDigests",
-        "osDistroVersion",
-        "applications",
-        "cloudMetadata",
-        "timeout",
-        "version",
-        "defenderLayerARN",
-        "vulnerabilitiesCount",
-        "image",
-        "packageManager",
-        "collections",
-        "provider",
-        "region",
-        "lastModified",
-        "tags",
-        "riskFactors",
-        "id",
-        "pushTime",
-        "vulnerabilityDistribution",
-        "installedProducts",
-        "history",
-        "labels",
-        "complianceIssues",
-        "scanTime",
-        "binaries",
-        "allCompliance",
-        "complianceDistribution",
-        "defended",
-        "hash",
-        "complianceIssuesCount",
-        "files",
-        "scannerVersion",
-        "vulnerabilityRiskScore",
-        "firstScanTime",
-        "type",
-        "isARM64",
-        "runtime",
-        "hostname",
-        "distro",
-        "Secrets",
-        "_id",
-        "architecture",
-        "osDistroRelease",
-        "memory",
-        "description",
-        "handler",
-        "resourceGroupName",
-        "cloudControllerAddress",
-        "applicationName",
-        "startupBinaries",
-        "packageCorrelationDone",
-    ]
+    tanzu_csv_fields = json.loads(os.getenv("TANZU_APPLICATION_CSV_COLUMNS"))
+
+    ###########################################################################
+    # Initialize blob store client
+
+    blob_service_client = BlobServiceClient.from_connection_string(
+        blob_store_connection_string
+    )
+
+    container_name = os.getenv("STORAGE_ACCOUNT_CONTAINER_NAME")
+    try:
+        container_client = blob_service_client.get_container_client(container_name)
+    except exceptions.ResourceNotFoundError:
+        container_client = blob_service_client.create_container(container_name)
+    blob_client = container_client.get_blob_client(blob_name)
+
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+    try:
+        container_client.delete_blob(blob_name)
+    except exceptions.ResourceNotFoundError:
+        pass
 
     ###########################################################################
     # Generate Prisma Token
@@ -1984,21 +1695,13 @@ def export_tanzu_blobstore_application_csv(req: func.HttpRequest):
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
     ###########################################################################
-    # Delete the CSV file if it exists from a previous run
-
-    try:
-        os.remove(file_path)
-    except FileNotFoundError:
-        pass
-
-    ###########################################################################
     # Get blobstore data from Prisma and write to CSV
 
     end_of_page = False
-    new_file = True
     offset = 0
     incremental_id = 0
     page_limit = 50
+    application_list = list()
 
     while not end_of_page:
         (
@@ -2012,7 +1715,6 @@ def export_tanzu_blobstore_application_csv(req: func.HttpRequest):
             if tanzu_blobstore_response:
                 ###############################################################
                 # Flatten application list for each blob
-                application_list = list()
 
                 for blob in tanzu_blobstore_response:
                     application_dict = {"Incremental_ID": incremental_id}
@@ -2028,13 +1730,6 @@ def export_tanzu_blobstore_application_csv(req: func.HttpRequest):
                     application_list.append(application_dict)
                     incremental_id += 1
 
-                ###############################################################
-                # Write to CSV
-                write_data_to_csv(
-                    file_path, application_list, tanzu_csv_fields, new_file
-                )
-                new_file = False
-
                 offset += page_limit
             else:
                 end_of_page = True
@@ -2046,12 +1741,27 @@ def export_tanzu_blobstore_application_csv(req: func.HttpRequest):
         else:
             logger.error("API returned %s.", status_code)
 
-    return func.HttpResponse("This HTTP triggered function executed successfully.")
+    ###############################################################
+    # Write to CSV
+    if application_list:
+        write_csv_to_blob(
+            blob_name,
+            application_list,
+            tanzu_csv_fields,
+            blob_client,
+            new_file=True,
+        )
+    else:
+        logger.info("No data to write to CSV, it will not be created.")
 
 
-@function_app.function_name(name="export_tanzu_blobstore_vulnerability_csv")
-@app.route(route="export_tanzu_blobstore_vulnerability_csv")
-def export_tanzu_blobstore_vulnerability_csv(req: func.HttpRequest):
+@function_app.function_name(
+    name="export_tanzu_blobstore_vulnerability_csv_timer_trigger"
+)
+@function_app.schedule(
+    schedule=CRON_SCHEDULE, arg_name="timer", run_on_startup=False, use_monitor=True
+)
+def export_tanzu_blobstore_vulnerability_csv(timer: func.TimerRequest):
     """
     Gets tanzu blobstore data from Prisma and cleans up for exporting to CSV.
 
@@ -2070,62 +1780,49 @@ def export_tanzu_blobstore_vulnerability_csv(req: func.HttpRequest):
     tanzu_blobstore_vulnerability_fields_of_interest = json.loads(
         os.getenv("TANZU_BLOBSTORE_VULNERABILITY_FIELDS_OF_INTEREST")
     )
-    file_path = f"CSVs/{tanzu_blobstore_vulnerability_csv_name}_{todays_date}.csv"
+    blob_name = f"CSVs/{tanzu_blobstore_vulnerability_csv_name}_{todays_date}.csv"
+    blob_store_connection_string = os.getenv("AzureWebJobsStorage")
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
 
-    tanzu_csv_fields = [
-        "Incremental_ID",
-        "Resource_ID",
-        "link",
-        "description",
-        "cri",
-        "cvss",
-        "templates",
-        "vecStr",
-        "applicableRules",
-        "fixDate",
-        "packageVersion",
-        "status",
-        "twistlock",
-        "text",
-        "packageName",
-        "exploit",
-        "layerTime",
-        "title",
-        "functionLayer",
-        "severity",
-        "discovered",
-        "cve",
-        "type",
-        "id",
-        "cause",
-        "published",
-        "riskFactors",
-        "exploits",
-    ]
+    tanzu_csv_fields = json.loads(os.getenv("TANZU_VULNERABILITY_CSV_COLUMNS"))
 
-    ######################################################################################################################
+    ###########################################################################
+    # Initialize blob store client
+
+    blob_service_client = BlobServiceClient.from_connection_string(
+        blob_store_connection_string
+    )
+
+    container_name = os.getenv("STORAGE_ACCOUNT_CONTAINER_NAME")
+
+    try:
+        container_client = blob_service_client.get_container_client(container_name)
+    except exceptions.ResourceNotFoundError:
+        container_client = blob_service_client.create_container(container_name)
+
+    blob_client = container_client.get_blob_client(blob_name)
+
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+    try:
+        container_client.delete_blob(blob_name)
+    except exceptions.ResourceNotFoundError:
+        pass
+
+    ###########################################################################
     # Generate Prisma Token
 
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
     ###########################################################################
-    # Delete the CSV file if it exists from a previous run
-
-    try:
-        os.remove(file_path)
-    except FileNotFoundError:
-        pass
-
-    ###########################################################################
     # Get blobstore data from Prisma and write to CSV
 
     end_of_page = False
-    new_file = True
     offset = 0
     incremental_id = 0
     page_limit = 50
+    vulnerability_list = list()
 
     while not end_of_page:
         (
@@ -2139,7 +1836,6 @@ def export_tanzu_blobstore_vulnerability_csv(req: func.HttpRequest):
             if tanzu_blobstore_response:
                 ###############################################################
                 # Flatten vulnerability list for each blob
-                vulnerability_list = list()
 
                 for blob in tanzu_blobstore_response:
                     if "vulnerabilities" in blob:
@@ -2165,13 +1861,6 @@ def export_tanzu_blobstore_vulnerability_csv(req: func.HttpRequest):
                                 vulnerability_list.append(vulnerability_dict)
                                 incremental_id += 1
 
-                ###############################################################
-                # Write to CSV
-                write_data_to_csv(
-                    file_path, vulnerability_list, tanzu_csv_fields, new_file
-                )
-                new_file = False
-
                 offset += page_limit
             else:
                 end_of_page = True
@@ -2183,4 +1872,55 @@ def export_tanzu_blobstore_vulnerability_csv(req: func.HttpRequest):
         else:
             logger.error("API returned %s.", status_code)
 
-    return func.HttpResponse("This HTTP triggered function executed successfully.")
+    ###############################################################
+    # Write to CSV
+    if vulnerability_list:
+        write_csv_to_blob(
+            blob_name,
+            vulnerability_list,
+            tanzu_csv_fields,
+            blob_client,
+            new_file=True,
+        )
+    else:
+        logger.info("No data to write to CSV, it will not be created.")
+
+
+def write_csv_to_blob(
+    blob_name: str,
+    data_list: list[dict],
+    field_names: list[str],
+    blob_client,
+    new_file=False,
+) -> None:
+    """
+    Writes list of iterable data to CSV.
+
+    Parameters:
+    blob_name (str): File path
+    data_list (list[dict]): List of dictionaries
+
+    """
+    logger.info("Writing data to %s", blob_name)
+
+    csv_buffer = StringIO()
+
+    writer = csv.DictWriter(csv_buffer, fieldnames=field_names)
+
+    if new_file:
+        writer.writeheader()
+
+    # Write the CSV rows
+    try:
+        for data in data_list:
+            writer.writerow(data)
+    except ValueError as ex:
+        logger.error(
+            "%s\r\nPlease add it to the appropriate *_CSV_COLUMNS environment variable list.",
+            str(ex),
+        )
+
+        raise
+
+    # Upload the CSV data to the blob
+    blob_client.upload_blob(csv_buffer.getvalue().encode("utf-8"), overwrite=True)

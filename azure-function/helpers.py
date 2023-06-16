@@ -92,7 +92,9 @@ def prisma_get_tanzu_blob_store_scan_results(
 
     endpoint = f"https://{cwp_endpoint}/api/v1/tas-droplets?offset={str(offset)}&limit={str(limit)}"
 
-    logger.info("Getting host scan results from Prisma using endpoint: %s", endpoint)
+    logger.info(
+        "Getting tanzu blobstore scan results from Prisma using endpoint: %s", endpoint
+    )
 
     headers = {
         "accept": "application/json; charset=UTF-8",
@@ -269,35 +271,3 @@ def prisma_get_containers_scan_results(
         return data, 200
     else:
         return None, response.status_code
-
-
-def write_data_to_csv(
-    file_path: str, data_list: list[dict], field_names: list[str], new_file=False
-) -> None:
-    """
-    Writes list of iterable data to CSV.
-
-    Parameters:
-    file_path (str): File path
-    data_list (list[dict]): List of dictionaries
-
-    """
-    logger.info("Writing data to %s", file_path)
-
-    try:
-        csv_file = open(file_path, "a", newline="", encoding="utf-8")
-
-    except FileNotFoundError:
-        os.mkdir("CSVs")
-        csv_file = open(file_path, "w", newline="", encoding="utf-8")
-
-    writer = csv.DictWriter(csv_file, fieldnames=field_names)
-
-    if new_file:
-        writer.writeheader()
-
-    # Write the CSV rows
-    for data in data_list:
-        writer.writerow(data)
-
-    csv_file.close()

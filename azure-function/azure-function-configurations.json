@@ -1,0 +1,227 @@
+[
+    {
+        "name": "PRISMA_ACCESS_KEY",
+        "value": "",
+        "slotSetting": false
+    },
+    {
+        "name": "CRON_SCHEDULE",
+        "value": "0 0 * * *",
+        "slotSetting": false
+    },
+    {
+        "name": "CSPM_API",
+        "value": "api2.prismacloud.io",
+        "slotSetting": false
+    },
+    {
+        "name": "CWPP_API",
+        "value": "us-east1.cloud.twistlock.com/us-1-111573457",
+        "slotSetting": false
+    },
+    {
+        "name": "PRISMA_SECRET_KEY",
+        "value": "",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "OPENSHIFT_APPLICATIONS_CSV_NAME",
+        "value": "OpenShift_Applications_DEV",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "OWNER_ID_KEY",
+        "value": "ays_support_group",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "APP_ID_KEY",
+        "value": "hcsc.co/application_id",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "DEFAULT_APP_ID",
+        "value": "APP00046878",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "OPENSHIFT_COLLECTIONS_FILTER",
+        "value": "[]",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "OPENSHIFT_CONTAINERS_CSV_NAME",
+        "value": "OpenShift_Containers_DEV",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "HOST_CONTAINERS_CSV_NAME",
+        "value": "Host_Containers_DEV",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "TAS_CONTAINERS_CSV_NAME",
+        "value": "TAS_Containers_DEV",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "IMAGE_VULNERABILITY_CSV_NAME",
+        "value": "OpenShift_Vulnerability_DEV",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "HOST_APPLICATION_CSV_NAME",
+        "value": "Azure_Host_Application_DEV",
+        "slotSetting": false
+    },
+    {
+        "name": "HOST_APPLICATION_FIELDS_OF_INTEREST",
+        "value": "[\"Incremental_ID\", \"repoTag\", \"firewallProtection\", \"history\", \"creationTime\", \"packageManager\", \"complianceIssuesCount\", \"collections\", \"pushTime\", \"scanBuildDate\", \"osDistro\", \"labels\", \"scanVersion\", \"hostDevices\", \"err\", \"packageCorrelationDone\", \"scanID\", \"firstScanTime\", \"complianceDistribution\", \"startupBinaries\", \"vulnerabilityRiskScore\", \"image\", \"agentless\", \"tags\", \"appEmbedded\", \"wildFireUsage\", \"trustStatus\", \"hosts\", \"Secrets\", \"vulnerabilitiesCount\", \"type\", \"riskFactors\", \"osDistroRelease\", \"applications\", \"isARM64\", \"distro\", \"vulnerabilityDistribution\", \"complianceRiskScore\", \"allCompliance\", \"binaries\", \"instances\", \"files\", \"installedProducts\", \"scanTime\", \"complianceIssues\", \"cloudMetadata\", \"hostname\", \"_id\", \"packages\", \"osDistroVersion\", \"repoDigests\", \"externalLabels\", \"rhelRepos\", \"clusters\", \"k8sClusterAddr\", \"stopped\", \"ecsClusterName\"]",
+        "slotSetting": false
+      },
+      {
+        "name": "HOST_VULNERABILITY_FIELDS_OF_INTEREST",
+        "value": "[\"Incremental_ID\", \"Resource_ID\", \"Package_Path\", \"severity\", \"published\", \"vecStr\", \"exploit\", \"cri\", \"text\", \"type\", \"fixDate\", \"discovered\", \"title\", \"functionLayer\", \"cve\", \"twistlock\", \"riskFactors\", \"layerTime\", \"description\", \"link\", \"cause\", \"status\", \"templates\", \"applicableRules\", \"cvss\", \"id\", \"packageName\", \"packageVersion\", \"binaryPkgs\", \"exploits\", \"fixLink\", \"vulnTagInfos\"]",
+        "slotSetting": false
+      },
+      {
+        "name": "REGISTRY_IMAGE_APPLICATION_FIELDS_OF_INTEREST",
+        "value": "[\"Incremental_ID\", \"pushTime\", \"startupBinaries\", \"history\", \"vulnerabilitiesCount\", \"wildFireUsage\", \"osDistroVersion\", \"isARM64\", \"repoDigests\", \"packageCorrelationDone\", \"osDistro\", \"repoTag\", \"vulnerabilityRiskScore\", \"installedProducts\", \"files\", \"hosts\", \"firstScanTime\", \"trustStatus\", \"complianceIssuesCount\", \"firewallProtection\", \"complianceRiskScore\", \"collections\", \"Secrets\", \"err\", \"image\", \"riskFactors\", \"complianceIssues\", \"cloudMetadata\", \"allCompliance\", \"scanTime\", \"appEmbedded\", \"creationTime\", \"agentless\", \"packages\", \"_id\", \"complianceDistribution\", \"binaries\", \"packageManager\", \"tags\", \"instances\", \"osDistroRelease\", \"vulnerabilityDistribution\", \"resourceID\", \"type\", \"hostname\", \"id\", \"scanID\", \"registryType\", \"distro\", \"topLayer\", \"scanVersion\", \"scanBuildDate\", \"layers\", \"applications\"]",
+        "slotSetting": false
+      },
+      {
+        "name": "REGISTRY_IMAGE_VULNERABILITY_FIELDS_OF_INTEREST",
+        "value": "[\"Incremental_ID\", \"Resource_ID\", \"riskFactors\", \"twistlock\", \"cri\", \"cve\", \"cvss\", \"fixDate\", \"published\", \"description\", \"resourceID\", \"packageVersion\", \"text\", \"status\", \"functionLayer\", \"vecStr\", \"layerTime\", \"exploit\", \"title\", \"link\", \"type\", \"packageName\", \"templates\", \"applicableRules\", \"discovered\", \"id\", \"binaryPkgs\", \"severity\", \"cause\"] ",
+        "slotSetting": false
+      },
+      {
+        "name": "TANZU_BLOBSTORE_APPLICATION_FIELDS_OF_INTEREST",
+        "value": "[\"Incremental_ID\", \"packages\", \"creationTime\", \"name\", \"osDistro\", \"accountID\", \"repoTag\", \"complianceRiskScore\", \"repoDigests\", \"osDistroVersion\", \"applications\", \"cloudMetadata\", \"timeout\", \"version\", \"defenderLayerARN\", \"vulnerabilitiesCount\", \"image\", \"packageManager\", \"collections\", \"provider\", \"region\", \"lastModified\", \"tags\", \"riskFactors\", \"id\", \"pushTime\", \"vulnerabilityDistribution\", \"installedProducts\", \"history\", \"labels\", \"complianceIssues\", \"scanTime\", \"binaries\", \"allCompliance\", \"complianceDistribution\", \"defended\", \"hash\", \"complianceIssuesCount\", \"files\", \"scannerVersion\", \"vulnerabilityRiskScore\", \"firstScanTime\", \"type\", \"isARM64\", \"runtime\", \"hostname\", \"distro\", \"Secrets\", \"_id\", \"architecture\", \"osDistroRelease\", \"memory\", \"description\", \"handler\", \"resourceGroupName\", \"cloudControllerAddress\", \"applicationName\", \"startupBinaries\", \"packageCorrelationDone\"]",
+        "slotSetting": false
+      },
+      {
+        "name": "TANZU_BLOBSTORE_VULNERABILITY_FIELDS_OF_INTEREST",
+        "value": "[\"Incremental_ID\", \"Resource_ID\", \"link\", \"description\", \"cri\", \"cvss\", \"templates\", \"vecStr\", \"applicableRules\", \"fixDate\", \"packageVersion\", \"status\", \"twistlock\", \"text\", \"packageName\", \"exploit\", \"layerTime\", \"title\", \"functionLayer\", \"severity\", \"discovered\", \"cve\", \"type\", \"id\", \"cause\", \"published\", \"riskFactors\", \"exploits\"]",
+        "slotSetting": false
+      },
+      {
+        "name": "TAS_APPLICATION_FIELDS_OF_INTEREST",
+        "value": "[\"Incremental_ID\", \"osDistroVersion\", \"packageCorrelationDone\", \"complianceIssues\", \"pushTime\", \"applications\", \"isARM64\", \"hosts\", \"_id\", \"id\", \"startupBinaries\", \"repoTag\", \"appEmbedded\", \"vulnerabilitiesCount\", \"installedProducts\", \"osDistro\", \"scanID\", \"err\", \"scanVersion\", \"collections\", \"allCompliance\", \"firstScanTime\", \"vulnerabilityDistribution\", \"firewallProtection\", \"wildFireUsage\", \"scanTime\", \"tags\", \"complianceDistribution\", \"instances\", \"osDistroRelease\", \"packageManager\", \"complianceIssuesCount\", \"hostname\", \"agentless\", \"vulnerabilityRiskScore\", \"type\", \"complianceRiskScore\", \"clusters\", \"Secrets\", \"image\", \"cloudMetadata\", \"trustStatus\", \"distro\", \"creationTime\", \"repoDigests\", \"binaries\", \"packages\", \"files\", \"riskFactors\", \"history\"]",
+        "slotSetting": false
+      },
+      {
+        "name": "TAS_VULNERABILITY_FIELDS_OF_INTEREST",
+        "value": "[\"Incremental_ID\", \"Resource_ID\", \"labels\", \"type\", \"appEmbedded\", \"description\", \"firewallProtection\", \"clusters\", \"hostname\", \"scanVersion\", \"tags\", \"scanBuildDate\", \"Secrets\", \"binaries\", \"packageCorrelationDone\", \"layerTime\", \"scanTime\", \"wildFireUsage\", \"twistlock\", \"packages\", \"published\", \"_id\", \"complianceIssues\", \"distro\", \"text\", \"repoDigests\", \"hosts\", \"scanID\", \"vulnerabilitiesCount\", \"packageName\", \"isARM64\", \"id\", \"allCompliance\", \"status\", \"err\", \"severity\", \"cri\", \"functionLayer\", \"osDistro\", \"osDistroRelease\", \"creationTime\", \"cloudMetadata\", \"layers\", \"collections\", \"cause\", \"topLayer\", \"packageVersion\", \"exploit\", \"applicableRules\", \"trustStatus\", \"vulnerabilityRiskScore\", \"repoTag\", \"vulnerabilityDistribution\", \"vecStr\", \"instances\", \"title\", \"complianceDistribution\", \"firstScanTime\", \"cvss\", \"startupBinaries\", \"image\", \"link\", \"riskFactors\", \"pushTime\", \"complianceRiskScore\", \"files\", \"history\", \"agentless\", \"installedProducts\", \"complianceIssuesCount\", \"cve\", \"templates\", \"fixDate\", \"discovered\", \"osDistroVersion\", \"packageManager\", \"binaryPkgs\", \"exploits\", \"applications\", \"vulnTagInfos\", \"missingDistroVulnCoverage\", \"namespaces\", \"externalLabels\", \"rhelRepos\", \"gracePeriodDays\", \"block\", \"twistlockImage\", \"Package_Path\"]",
+        "slotSetting": false
+      },  {
+        "name": "HOST_VULNERABILITY_CSV_COLUMNS",
+        "value": "[\"Incremental_ID\", \"Resource_ID\", \"_id\", \"type\", \"hostname\", \"scanTime\", \"binaries\", \"Secrets\", \"startupBinaries\", \"osDistro\", \"osDistroVersion\", \"osDistroRelease\", \"distro\", \"packages\", \"files\", \"packageManager\", \"applications\", \"isARM64\", \"packageCorrelationDone\", \"image\", \"history\", \"complianceIssues\", \"allCompliance\", \"repoTag\", \"tags\", \"repoDigests\", \"creationTime\", \"pushTime\", \"vulnerabilitiesCount\", \"complianceIssuesCount\", \"vulnerabilityDistribution\", \"complianceDistribution\", \"vulnerabilityRiskScore\", \"complianceRiskScore\", \"k8sClusterAddr\", \"riskFactors\", \"labels\", \"installedProducts\", \"scanVersion\", \"scanBuildDate\", \"hostDevices\", \"firstScanTime\", \"cloudMetadata\", \"clusters\", \"instances\", \"hosts\", \"err\", \"collections\", \"scanID\", \"trustStatus\", \"firewallProtection\", \"appEmbedded\", \"wildFireUsage\", \"agentless\", \"text\", \"id\", \"severity\", \"cvss\", \"status\", \"cve\", \"cause\", \"description\", \"title\", \"vecStr\", \"exploit\", \"link\", \"packageName\", \"packageVersion\", \"layerTime\", \"templates\", \"twistlock\", \"cri\", \"published\", \"fixDate\", \"applicableRules\", \"discovered\", \"binaryPkgs\", \"vulnTagInfos\", \"functionLayer\", \"Package_Path\", \"Incremental_ID\", \"exploits\"]",
+        "slotSetting": false
+      },  {
+        "name": "REGISTRY_IMAGE_APPLICATION_CSV_COLUMNS",
+        "value": "[\"Incremental_ID\", \"pushTime\", \"startupBinaries\", \"history\", \"vulnerabilitiesCount\", \"wildFireUsage\", \"osDistroVersion\", \"isARM64\", \"repoDigests\", \"packageCorrelationDone\", \"osDistro\", \"repoTag\", \"vulnerabilityRiskScore\", \"installedProducts\", \"files\", \"hosts\", \"firstScanTime\", \"trustStatus\", \"complianceIssuesCount\", \"firewallProtection\", \"complianceRiskScore\", \"collections\", \"Secrets\", \"err\", \"image\", \"riskFactors\", \"complianceIssues\", \"cloudMetadata\", \"allCompliance\", \"scanTime\", \"appEmbedded\", \"creationTime\", \"agentless\", \"packages\", \"_id\", \"complianceDistribution\", \"binaries\", \"packageManager\", \"tags\", \"instances\", \"osDistroRelease\", \"vulnerabilityDistribution\", \"resourceID\", \"type\", \"hostname\", \"id\", \"scanID\", \"registryType\", \"distro\", \"topLayer\", \"scanVersion\", \"scanBuildDate\", \"layers\", \"applications\"]",
+        "slotSetting": false
+      },  {
+        "name": "REGISTRY_IMAGE_VULNERABILITY_CSV_COLUMNS",
+        "value": "[\"Incremental_ID\", \"Resource_ID\", \"riskFactors\", \"twistlock\", \"cri\", \"cve\", \"cvss\", \"fixDate\", \"published\", \"description\", \"resourceID\", \"packageVersion\", \"text\", \"status\", \"functionLayer\", \"vecStr\", \"layerTime\", \"exploit\", \"title\", \"link\", \"type\", \"packageName\", \"templates\", \"applicableRules\", \"discovered\", \"id\", \"binaryPkgs\", \"severity\", \"cause\"]",
+        "slotSetting": false
+      },  {
+        "name": "TANZU_APPLICATION_CSV_COLUMNS",
+        "value": "[\"Incremental_ID\", \"packages\", \"creationTime\", \"name\", \"osDistro\", \"accountID\", \"repoTag\", \"complianceRiskScore\", \"repoDigests\", \"osDistroVersion\", \"applications\", \"cloudMetadata\", \"timeout\", \"version\", \"defenderLayerARN\", \"vulnerabilitiesCount\", \"image\", \"packageManager\", \"collections\", \"provider\", \"region\", \"lastModified\", \"tags\", \"riskFactors\", \"id\", \"pushTime\", \"vulnerabilityDistribution\", \"installedProducts\", \"history\", \"labels\", \"complianceIssues\", \"scanTime\", \"binaries\", \"allCompliance\", \"complianceDistribution\", \"defended\", \"hash\", \"complianceIssuesCount\", \"files\", \"scannerVersion\", \"vulnerabilityRiskScore\", \"firstScanTime\", \"type\", \"isARM64\", \"runtime\", \"hostname\", \"distro\", \"Secrets\", \"_id\", \"architecture\", \"osDistroRelease\", \"memory\", \"description\", \"handler\", \"resourceGroupName\", \"cloudControllerAddress\", \"applicationName\", \"startupBinaries\", \"packageCorrelationDone\"]",
+        "slotSetting": false
+      },  {
+        "name": "TANZU_VULNERABILITY_CSV_COLUMNS",
+        "value": "[\"Incremental_ID\", \"Resource_ID\", \"link\", \"description\", \"cri\", \"cvss\", \"templates\", \"vecStr\", \"applicableRules\", \"fixDate\", \"packageVersion\", \"status\", \"twistlock\", \"text\", \"packageName\", \"exploit\", \"layerTime\", \"title\", \"functionLayer\", \"severity\", \"discovered\", \"cve\", \"type\", \"id\", \"cause\", \"published\", \"riskFactors\", \"exploits\"]",
+        "slotSetting": false
+      },
+      {
+        "name": "TAS_APPLICATION_CSV_COLUMNS",
+        "value": "[\"Incremental_ID\", \"osDistroVersion\", \"packageCorrelationDone\", \"complianceIssues\", \"pushTime\", \"applications\", \"isARM64\", \"hosts\", \"_id\", \"id\", \"startupBinaries\", \"repoTag\", \"appEmbedded\", \"vulnerabilitiesCount\", \"installedProducts\", \"osDistro\", \"scanID\", \"err\", \"scanVersion\", \"collections\", \"allCompliance\", \"firstScanTime\", \"vulnerabilityDistribution\", \"firewallProtection\", \"wildFireUsage\", \"scanTime\", \"tags\", \"complianceDistribution\", \"instances\", \"osDistroRelease\", \"packageManager\", \"complianceIssuesCount\", \"hostname\", \"agentless\", \"vulnerabilityRiskScore\", \"type\", \"complianceRiskScore\", \"clusters\", \"Secrets\", \"image\", \"cloudMetadata\", \"trustStatus\", \"distro\", \"creationTime\", \"repoDigests\", \"binaries\", \"packages\", \"files\", \"riskFactors\", \"history\"]",
+        "slotSetting": false
+      },  {
+        "name": "TAS_VULNERABILITY_CSV_COLUMNS",
+        "value": "[\"Incremental_ID\", \"labels\", \"type\", \"appEmbedded\", \"description\", \"firewallProtection\", \"clusters\", \"hostname\", \"scanVersion\", \"tags\", \"scanBuildDate\", \"Secrets\", \"binaries\", \"packageCorrelationDone\", \"layerTime\", \"scanTime\", \"wildFireUsage\", \"twistlock\", \"packages\", \"published\", \"_id\", \"complianceIssues\", \"distro\", \"text\", \"repoDigests\", \"hosts\", \"scanID\", \"vulnerabilitiesCount\", \"packageName\", \"isARM64\", \"id\", \"allCompliance\", \"status\", \"err\", \"severity\", \"cri\", \"functionLayer\", \"osDistro\", \"osDistroRelease\", \"creationTime\", \"cloudMetadata\", \"layers\", \"collections\", \"cause\", \"topLayer\", \"packageVersion\", \"exploit\", \"applicableRules\", \"trustStatus\", \"vulnerabilityRiskScore\", \"repoTag\", \"vulnerabilityDistribution\", \"vecStr\", \"instances\", \"title\", \"complianceDistribution\", \"firstScanTime\", \"cvss\", \"startupBinaries\", \"image\", \"link\", \"riskFactors\", \"pushTime\", \"complianceRiskScore\", \"files\", \"history\", \"agentless\", \"installedProducts\", \"complianceIssuesCount\", \"cve\", \"templates\", \"fixDate\", \"discovered\", \"osDistroVersion\", \"packageManager\", \"binaryPkgs\", \"exploits\", \"applications\", \"vulnTagInfos\", \"missingDistroVulnCoverage\", \"namespaces\", \"externalLabels\", \"rhelRepos\", \"gracePeriodDays\", \"block\", \"twistlockImage\", \"Package_Path\", \"Incremental_ID\"]",
+        "slotSetting": false
+      },
+    {
+        "name": "HOST_EXTERNAL_LABELS_TO_INCLUDE",
+        "value": "[\"APMID\"]",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "HOST_COLLECTIONS_FILTER",
+        "value": "[]",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "STORAGE_ACCOUNT_CONTAINER_NAME",
+        "value": "prisma_alert_reports",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "HOST_VULNERABILITY_CSV_NAME",
+        "value": "Azure_Host_Vulnerability_DEV",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "TANZU_BLOBSTORE_APPLICATION_CSV_NAME",
+        "value": "Blobstore_Application_DEV",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "TANZU_BLOBSTORE_VULNERABILITY_CSV_NAME",
+        "value": "Blobstore_Vulnerability_DEV",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "REGISTRY_IMAGE_VULNERABILITY_CSV_NAME",
+        "value": "Nexus_Vulnerability_DEV",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "REGISTRY_IMAGE_APPLICATION_CSV_NAME",
+        "value": "Nexus_Application_DEV",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "TAS_APPLICATION_CSV_NAME",
+        "value": "TAS_Applications_DEV",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "TAS_COLLECTIONS_FILTER",
+        "value": "[\"httpd image\"]",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "TAS_EXTERNAL_LABELS_TO_INCLUDE",
+        "value": "[\"APMID\"]",
+        "slotSetting": false
+    }
+    ,
+    {
+        "name": "TAS_VULNERABILITY_CSV_NAME",
+        "value": "TAS_Vulnerability_DEV",
+        "slotSetting": false
+    }
+]

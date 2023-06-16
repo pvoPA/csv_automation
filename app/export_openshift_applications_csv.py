@@ -19,7 +19,7 @@ def etl_applications_csv() -> None:
 
     """
     todays_date = str(dt.datetime.today()).split()[0]
-    applications_csv_name = os.getenv("APPLICATIONS_CSV_NAME")
+    applications_csv_name = os.getenv("OPENSHIFT_APPLICATIONS_CSV_NAME")
     COLLECTIONS_FILTER = ", ".join(
         json.loads(os.getenv("OPENSHIFT_COLLECTIONS_FILTER"))
     )
