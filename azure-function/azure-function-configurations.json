@@ -27,7 +27,7 @@
     ,
     {
         "name": "OPENSHIFT_APPLICATIONS_CSV_NAME",
-        "value": "OpenShift_Applications_DEV",
+        "value": "OpenShift-Applications-DEV",
         "slotSetting": false
     }
     ,
@@ -57,31 +57,31 @@
     ,
     {
         "name": "OPENSHIFT_CONTAINERS_CSV_NAME",
-        "value": "OpenShift_Containers_DEV",
+        "value": "OpenShift-Containers-DEV",
         "slotSetting": false
     }
     ,
     {
         "name": "HOST_CONTAINERS_CSV_NAME",
-        "value": "Host_Containers_DEV",
+        "value": "Host-Containers-DEV",
         "slotSetting": false
     }
     ,
     {
         "name": "TAS_CONTAINERS_CSV_NAME",
-        "value": "TAS_Containers_DEV",
+        "value": "TAS-Containers-DEV",
         "slotSetting": false
     }
     ,
     {
         "name": "IMAGE_VULNERABILITY_CSV_NAME",
-        "value": "OpenShift_Vulnerability_DEV",
+        "value": "OpenShift-Vulnerability-DEV",
         "slotSetting": false
     }
     ,
     {
         "name": "HOST_APPLICATION_CSV_NAME",
-        "value": "Azure_Host_Application_DEV",
+        "value": "Azure-Host-Application-DEV",
         "slotSetting": false
     },
     {
@@ -173,37 +173,37 @@
     ,
     {
         "name": "HOST_VULNERABILITY_CSV_NAME",
-        "value": "Azure_Host_Vulnerability_DEV",
+        "value": "Azure-Host-Vulnerability-DEV",
         "slotSetting": false
     }
     ,
     {
         "name": "TANZU_BLOBSTORE_APPLICATION_CSV_NAME",
-        "value": "Blobstore_Application_DEV",
+        "value": "Blobstore-Application-DEV",
         "slotSetting": false
     }
     ,
     {
         "name": "TANZU_BLOBSTORE_VULNERABILITY_CSV_NAME",
-        "value": "Blobstore_Vulnerability_DEV",
+        "value": "Blobstore-Vulnerability-DEV",
         "slotSetting": false
     }
     ,
     {
         "name": "REGISTRY_IMAGE_VULNERABILITY_CSV_NAME",
-        "value": "Nexus_Vulnerability_DEV",
+        "value": "Nexus-Vulnerability-DEV",
         "slotSetting": false
     }
     ,
     {
         "name": "REGISTRY_IMAGE_APPLICATION_CSV_NAME",
-        "value": "Nexus_Application_DEV",
+        "value": "Nexus-Application-DEV",
         "slotSetting": false
     }
     ,
     {
         "name": "TAS_APPLICATION_CSV_NAME",
-        "value": "TAS_Applications_DEV",
+        "value": "TAS-Applications-DEV",
         "slotSetting": false
     }
     ,
@@ -221,7 +221,7 @@
     ,
     {
         "name": "TAS_VULNERABILITY_CSV_NAME",
-        "value": "TAS_Vulnerability_DEV",
+        "value": "TAS-Vulnerability-DEV",
         "slotSetting": false
     }
 ]

@@ -36,10 +36,13 @@ Note:
 import os
 import json
 import datetime as dt
+from azure.core import exceptions
+from azure.storage.blob import BlobServiceClient
 from helpers import logger
 from helpers import prisma_get_registry_image_scan_results
 from helpers import generate_prisma_token
 from helpers import write_data_to_csv
+from helpers import write_csv_to_blob
 
 
 def etl_registry_image_application_csv():
@@ -60,68 +63,37 @@ def etl_registry_image_application_csv():
     registry_image_blobstore_application_fields_of_interest = json.loads(
         os.getenv("REGISTRY_IMAGE_APPLICATION_FIELDS_OF_INTEREST")
     )
-    file_path = (
+    blob_name = (
         f"CSVs/{registry_image_blobstore_application_csv_name}_{todays_date}.csv"
     )
+    blob_store_connection_string = os.getenv("AzureWebJobsStorage")
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
 
-    registry_image_csv_fields = [
-        "Incremental_ID",
-        "pushTime",
-        "startupBinaries",
-        "history",
-        "vulnerabilitiesCount",
-        "wildFireUsage",
-        "osDistroVersion",
-        "isARM64",
-        "repoDigests",
-        "packageCorrelationDone",
-        "osDistro",
-        "repoTag",
-        "vulnerabilityRiskScore",
-        "installedProducts",
-        "files",
-        "hosts",
-        "firstScanTime",
-        "trustStatus",
-        "complianceIssuesCount",
-        "firewallProtection",
-        "complianceRiskScore",
-        "collections",
-        "Secrets",
-        "err",
-        "image",
-        "riskFactors",
-        "complianceIssues",
-        "cloudMetadata",
-        "allCompliance",
-        "scanTime",
-        "appEmbedded",
-        "creationTime",
-        "agentless",
-        "packages",
-        "_id",
-        "complianceDistribution",
-        "binaries",
-        "packageManager",
-        "tags",
-        "instances",
-        "osDistroRelease",
-        "vulnerabilityDistribution",
-        "resourceID",
-        "type",
-        "hostname",
-        "id",
-        "scanID",
-        "registryType",
-        "distro",
-        "topLayer",
-        "scanVersion",
-        "scanBuildDate",
-        "layers",
-        "applications",
-    ]
+    registry_image_csv_fields = json.loads(
+        os.getenv("REGISTRY_IMAGE_APPLICATION_CSV_COLUMNS")
+    )
+
+    ###########################################################################
+    # Initialize blob store client
+
+    blob_service_client = BlobServiceClient.from_connection_string(
+        blob_store_connection_string
+    )
+
+    container_name = os.getenv("STORAGE_ACCOUNT_CONTAINER_NAME")
+    try:
+        container_client = blob_service_client.get_container_client(container_name)
+    except exceptions.ResourceNotFoundError:
+        container_client = blob_service_client.create_container(container_name)
+    blob_client = container_client.get_blob_client(blob_name)
+
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+    try:
+        container_client.delete_blob(blob_name)
+    except exceptions.ResourceNotFoundError:
+        pass
 
     ###########################################################################
     # Generate Prisma Token
@@ -129,25 +101,15 @@ def etl_registry_image_application_csv():
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
     ###########################################################################
-    # Delete the CSV file if it exists from a previous run
-
-    try:
-        os.remove(file_path)
-    except FileNotFoundError:
-        pass
-
-    ###########################################################################
     # Get registry images from Prisma and write to CSV
 
     end_of_page = False
-    new_file = True
     offset = 0
     incremental_id = 0
     page_limit = 50
+    registry_image_list = list()
 
     while not end_of_page:
-        registry_image_list = list()
-
         (
             registry_image_response,
             status_code,
@@ -186,13 +148,6 @@ def etl_registry_image_application_csv():
 
                     incremental_id += 1
 
-                ##############################################################
-                # Write to CSV
-                write_data_to_csv(
-                    file_path, registry_image_list, registry_image_csv_fields, new_file
-                )
-                new_file = False
-
                 offset += page_limit
             else:
                 end_of_page = True
@@ -201,6 +156,19 @@ def etl_registry_image_application_csv():
             logger.error("Prisma token timed out, generating a new one and continuing.")
 
             prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
+
+    ##############################################################
+    # Write to CSV
+    if registry_image_list:
+        write_csv_to_blob(
+            blob_name,
+            registry_image_list,
+            registry_image_csv_fields,
+            blob_client,
+            new_file=True,
+        )
+    else:
+        logger.info("No data to write to CSV, it will not be created.")
 
 
 if __name__ == "__main__":

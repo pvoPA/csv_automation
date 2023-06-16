@@ -30,9 +30,11 @@ Note:
 import os
 import json
 import datetime as dt
+from azure.core import exceptions
+from azure.storage.blob import BlobServiceClient
 from helpers import logger
 from helpers import generate_prisma_token
-from helpers import write_data_to_csv
+from helpers import write_csv_to_blob
 from helpers import prisma_get_host_scan_results
 
 
@@ -48,79 +50,42 @@ def etl_host_applications_csv():
 
     """
     todays_date = str(dt.datetime.today()).split()[0]
-    COLLECTIONS_FILTER = ", ".join(json.loads(os.getenv("HOST_COLLECTIONS_FILTER")))
     host_application_csv_name = os.getenv("HOST_APPLICATION_CSV_NAME")
     host_application_fields_of_interest = json.loads(
         os.getenv("HOST_APPLICATION_FIELDS_OF_INTEREST")
     )
-    file_path = f"CSVs/{host_application_csv_name}_{todays_date}.csv"
+    blob_name = f"CSVs/{host_application_csv_name}_{todays_date}.csv"
+    blob_store_connection_string = os.getenv("AzureWebJobsStorage")
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
     external_labels_to_include = json.loads(
         os.getenv("HOST_EXTERNAL_LABELS_TO_INCLUDE")
     )
-    host_application_fields = [
-        "Incremental_ID",
-        "repoTag",
-        "firewallProtection",
-        "history",
-        "creationTime",
-        "packageManager",
-        "complianceIssuesCount",
-        "collections",
-        "pushTime",
-        "scanBuildDate",
-        "osDistro",
-        "labels",
-        "scanVersion",
-        "hostDevices",
-        "err",
-        "packageCorrelationDone",
-        "scanID",
-        "firstScanTime",
-        "complianceDistribution",
-        "startupBinaries",
-        "vulnerabilityRiskScore",
-        "image",
-        "agentless",
-        "tags",
-        "appEmbedded",
-        "wildFireUsage",
-        "trustStatus",
-        "hosts",
-        "Secrets",
-        "vulnerabilitiesCount",
-        "type",
-        "riskFactors",
-        "osDistroRelease",
-        "applications",
-        "isARM64",
-        "distro",
-        "vulnerabilityDistribution",
-        "complianceRiskScore",
-        "allCompliance",
-        "binaries",
-        "instances",
-        "files",
-        "installedProducts",
-        "scanTime",
-        "complianceIssues",
-        "cloudMetadata",
-        "hostname",
-        "_id",
-        "packages",
-        "osDistroVersion",
-        "repoDigests",
-        "externalLabels",
-        "rhelRepos",
-        "clusters",
-        "k8sClusterAddr",
-        "stopped",
-        "ecsClusterName",
-    ]
+    host_application_fields = json.loads(os.getenv("HOST_APPLICATION_CSV_COLUMNS"))
 
     for external_label in external_labels_to_include:
         host_application_fields.append(external_label)
+
+    ###########################################################################
+    # Initialize blob store client
+
+    blob_service_client = BlobServiceClient.from_connection_string(
+        blob_store_connection_string
+    )
+
+    container_name = os.getenv("STORAGE_ACCOUNT_CONTAINER_NAME")
+    try:
+        container_client = blob_service_client.get_container_client(container_name)
+    except exceptions.ResourceNotFoundError:
+        container_client = blob_service_client.create_container(container_name)
+    blob_client = container_client.get_blob_client(blob_name)
+
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+    try:
+        container_client.delete_blob(blob_name)
+    except exceptions.ResourceNotFoundError:
+        pass
 
     ###########################################################################
     # Generate Prisma Token
@@ -128,27 +93,17 @@ def etl_host_applications_csv():
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
     ###########################################################################
-    # Delete the CSV file if it exists from a previous run
-
-    try:
-        os.remove(file_path)
-    except FileNotFoundError:
-        pass
-
-    ###########################################################################
     # Get hosts from Prisma
 
     end_of_page = False
-    new_file = True
     offset = 0
     incremental_id = 0
     page_limit = 50
+    host_list = list()
 
     while not end_of_page:
-        host_list = list()
-
         host_response, status_code = prisma_get_host_scan_results(
-            prisma_token, offset=offset, limit=page_limit, collection=COLLECTIONS_FILTER
+            prisma_token, offset=offset, limit=page_limit
         )
 
         if status_code == 200:
@@ -182,10 +137,6 @@ def etl_host_applications_csv():
 
                 ##############################################################
                 # Write to CSV
-                write_data_to_csv(
-                    file_path, host_list, host_application_fields, new_file
-                )
-                new_file = False
 
                 offset += page_limit
             else:
@@ -197,6 +148,13 @@ def etl_host_applications_csv():
             prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
         else:
             logger.error("API returned %s.", status_code)
+
+    if host_list:
+        write_csv_to_blob(
+            blob_name, host_list, host_application_fields, blob_client, new_file=True
+        )
+    else:
+        logger.info("No data to write to CSV, it will not be created.")
 
 
 if __name__ == "__main__":

@@ -30,6 +30,7 @@ import os
 import csv
 import json
 import logging
+from io import StringIO
 from typing import Tuple
 import requests
 from dotenv import load_dotenv
@@ -306,3 +307,43 @@ def write_data_to_csv(
         writer.writerow(data)
 
     csv_file.close()
+
+
+def write_csv_to_blob(
+    blob_name: str,
+    data_list: list[dict],
+    field_names: list[str],
+    blob_client,
+    new_file=False,
+) -> None:
+    """
+    Writes list of iterable data to CSV.
+
+    Parameters:
+    blob_name (str): File path
+    data_list (list[dict]): List of dictionaries
+
+    """
+    logger.info("Writing data to %s", blob_name)
+
+    csv_buffer = StringIO()
+
+    writer = csv.DictWriter(csv_buffer, fieldnames=field_names)
+
+    if new_file:
+        writer.writeheader()
+
+    # Write the CSV rows
+    try:
+        for data in data_list:
+            writer.writerow(data)
+    except ValueError as ex:
+        logger.error(
+            "%s\r\nPlease add it to the appropriate *_CSV_COLUMNS environment variable list.",
+            str(ex),
+        )
+
+        raise
+
+    # Upload the CSV data to the blob
+    blob_client.upload_blob(csv_buffer.getvalue().encode("utf-8"), overwrite=True)

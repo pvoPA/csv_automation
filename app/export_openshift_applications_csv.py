@@ -1,10 +1,13 @@
 import os
 import json
 import datetime as dt
+from azure.core import exceptions
+from azure.storage.blob import BlobServiceClient
 from helpers import logger
 from helpers import generate_prisma_token
 from helpers import prisma_get_containers_scan_results
 from helpers import write_data_to_csv
+from helpers import write_csv_to_blob
 
 
 def etl_applications_csv() -> None:
@@ -25,13 +28,29 @@ def etl_applications_csv() -> None:
     )
     APPLICATION_ID_KEY = os.getenv("APP_ID_KEY")
     OWNER_ID_KEY = os.getenv("OWNER_ID_KEY")
+    blob_store_connection_string = os.getenv("AzureWebJobsStorage")
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
 
-    file_path = f"CSVs/{applications_csv_name}_{todays_date}.csv"
+    blob_name = f"CSVs/{applications_csv_name}_{todays_date}.csv"
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
     csv_fields = ["Incremental_ID", "Container_ID", "App_ID", "Owner"]
+
+    ###########################################################################
+    # Initialize blob store client
+
+    blob_service_client = BlobServiceClient.from_connection_string(
+        blob_store_connection_string
+    )
+
+    container_name = os.getenv("STORAGE_ACCOUNT_CONTAINER_NAME")
+    try:
+        container_client = blob_service_client.get_container_client(container_name)
+    except exceptions.ResourceNotFoundError:
+        container_client = blob_service_client.create_container(container_name)
+
+    blob_client = container_client.get_blob_client(blob_name)
 
     ###########################################################################
     # Get containers from Prisma
@@ -126,7 +145,17 @@ def etl_applications_csv() -> None:
 
             incremental_id += 1
 
-    write_data_to_csv(file_path, csv_rows, csv_fields, new_file=True)
+    ###########################################################################
+    # Delete the CSV file if it exists from a previous run
+    try:
+        container_client.delete_blob(blob_name)
+    except exceptions.ResourceNotFoundError:
+        pass
+
+    if csv_rows:
+        write_csv_to_blob(blob_name, csv_rows, csv_fields, blob_client, new_file=True)
+    else:
+        logger.info("No data to write to CSV, it will not be created.")
 
 
 if __name__ == "__main__":
