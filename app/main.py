@@ -33,20 +33,20 @@ def main(data="", context=""):
     TAS_CONTAINERS_CSV_NAME = os.getenv("TAS_CONTAINERS_CSV_NAME")
 
     ###########################################################################
-    logger.info("Generating OpenShift CSV reports")
-    logger.info("\tCreating openshift containers CSV...")
-    etl_containers_csv(OPENSHIFT_COLLECTIONS_FILTER, OPENSHIFT_CONTAINERS_CSV_NAME)
-    logger.info("\tCreating openshift applications CSV...")
-    etl_applications_csv()
-    logger.info("\tCreating openshift image vulnerabilities CSV...")
-    etl_images_vulnerabilities_csv()
+    # logger.info("Generating OpenShift CSV reports")
+    # logger.info("\tCreating openshift containers CSV...")
+    # etl_containers_csv(OPENSHIFT_COLLECTIONS_FILTER, OPENSHIFT_CONTAINERS_CSV_NAME)
+    # logger.info("\tCreating openshift applications CSV...")
+    # etl_applications_csv()
+    # logger.info("\tCreating openshift image vulnerabilities CSV...")
+    # etl_images_vulnerabilities_csv()
 
-    ###########################################################################
-    logger.info("Generating Azure Host CSV reports")
-    # logger.info("\tCreating host containers CSV...")
-    # etl_containers_csv(HOST_COLLECTIONS_FILTER, HOST_CONTAINERS_CSV_NAME)
-    logger.info("\tCreating host applications CSV...")
-    etl_host_applications_csv()
+    # ###########################################################################
+    # logger.info("Generating Azure Host CSV reports")
+    # # logger.info("\tCreating host containers CSV...")
+    # # etl_containers_csv(HOST_COLLECTIONS_FILTER, HOST_CONTAINERS_CSV_NAME)
+    # logger.info("\tCreating host applications CSV...")
+    # etl_host_applications_csv()
     logger.info("\tCreating host vulnerabilities CSV...")
     etl_host_vulnerabilities_csv()
 
