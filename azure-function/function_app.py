@@ -327,9 +327,7 @@ def export_openshift_containers_csv(timer: func.TimerRequest):
         logger.info("No data to write to CSV, it will not be created.")
 
 
-@function_app.function_name(
-    name="export_openshift_image_vulnerability_csv_timer_trigger"
-)
+@function_app.function_name(name="export_openshift_vulnerability_csv_timer_trigger")
 @function_app.schedule(
     schedule=CRON_SCHEDULE, arg_name="timer", run_on_startup=False, use_monitor=True
 )
