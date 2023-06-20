@@ -1186,7 +1186,13 @@ def export_tas_vulnerability_csv(timer: func.TimerRequest):
                     IMAGE_ID = container["info"]["imageID"]
                     if IMAGE_ID in tas_vulnerability_dict:
                         for vuln in tas_vulnerability_dict[IMAGE_ID]:
-                            vuln.update({"Incremental_ID": incremental_id})
+                            vuln.update(
+                                {
+                                    "Incremental_ID": incremental_id,
+                                    "Container_ID": container["_id"],
+                                    "Resource_ID": IMAGE_ID,
+                                }
+                            )
 
                             csv_rows.append(vuln)
 
@@ -1343,7 +1349,13 @@ def export_tas_application_csv(timer: func.TimerRequest):
                     IMAGE_ID = container["info"]["imageID"]
                     if IMAGE_ID in tas_application_dict:
                         for vuln in tas_application_dict[IMAGE_ID]:
-                            vuln.update({"Incremental_ID": incremental_id})
+                            vuln.update(
+                                {
+                                    "Incremental_ID": incremental_id,
+                                    "Container_ID": container["_id"],
+                                    "Resource_ID": IMAGE_ID,
+                                }
+                            )
 
                             csv_rows.append(vuln)
 

@@ -173,7 +173,13 @@ def etl_tas_application_csv():
                     IMAGE_ID = container["info"]["imageID"]
                     if IMAGE_ID in tas_application_dict:
                         for vuln in tas_application_dict[IMAGE_ID]:
-                            vuln.update({"Incremental_ID": incremental_id})
+                            vuln.update(
+                                {
+                                    "Incremental_ID": incremental_id,
+                                    "Container_ID": container["_id"],
+                                    "Resource_ID": IMAGE_ID,
+                                }
+                            )
 
                             csv_rows.append(vuln)
 
