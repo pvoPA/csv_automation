@@ -41,8 +41,7 @@ import datetime as dt
 from azure.core import exceptions
 from azure.storage.blob import BlobServiceClient
 from helpers import logger
-from helpers import prisma_get_images_scan_results
-from helpers import prisma_get_containers_scan_results
+from helpers import prisma_get_tanzu_blob_store_scan_results
 from helpers import generate_prisma_token
 from helpers import write_data_to_csv
 from helpers import write_csv_to_blob
@@ -50,7 +49,7 @@ from helpers import write_csv_to_blob
 
 def etl_tanzu_blobstore_applications_csv():
     """
-    Gets tanzu application service data from Prisma and export to CSV.
+    Gets tanzu blobstore data from Prisma and cleans up for exporting to CSV.
 
     Parameters:
         None
@@ -60,22 +59,19 @@ def etl_tanzu_blobstore_applications_csv():
 
     """
     todays_date = str(dt.datetime.today()).split()[0]
-    COLLECTIONS_FILTER = ", ".join(json.loads(os.getenv("TAS_COLLECTIONS_FILTER")))
-    tas_blobstore_application_csv_name = os.getenv("TAS_APPLICATION_CSV_NAME")
-    tas_blobstore_application_fields_of_interest = json.loads(
-        os.getenv("TAS_APPLICATION_FIELDS_OF_INTEREST")
-    )
 
-    blob_name = f"CSVs/{tas_blobstore_application_csv_name}_{todays_date}.csv"
+    tanzu_blobstore_application_csv_name = os.getenv(
+        "TANZU_BLOBSTORE_APPLICATION_CSV_NAME"
+    )
+    tanzu_blobstore_application_fields_of_interest = json.loads(
+        os.getenv("TANZU_BLOBSTORE_APPLICATION_FIELDS_OF_INTEREST")
+    )
+    blob_name = f"CSVs/{tanzu_blobstore_application_csv_name}_{todays_date}.csv"
     blob_store_connection_string = os.getenv("AzureWebJobsStorage")
     prisma_access_key = os.getenv("PRISMA_ACCESS_KEY")
     prisma_secret_key = os.getenv("PRISMA_SECRET_KEY")
-    external_labels_to_include = json.loads(os.getenv("TAS_EXTERNAL_LABELS_TO_INCLUDE"))
 
-    tas_csv_fields = json.loads(os.getenv("TAS_APPLICATION_CSV_COLUMNS"))
-
-    for external_label in external_labels_to_include:
-        tas_csv_fields.append(external_label)
+    tanzu_csv_fields = json.loads(os.getenv("TANZU_APPLICATION_CSV_COLUMNS"))
 
     ###########################################################################
     # Initialize blob store client
@@ -94,7 +90,9 @@ def etl_tanzu_blobstore_applications_csv():
     ###########################################################################
     # Delete the CSV file if it exists from a previous run
     try:
-        container_client.delete_blob(blob_name)
+        for blob in container_client.list_blob_names():
+            if todays_date not in blob:
+                container_client.delete_blob(blob)
     except exceptions.ResourceNotFoundError:
         pass
 
@@ -104,44 +102,40 @@ def etl_tanzu_blobstore_applications_csv():
     prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
 
     ###########################################################################
-    # Get images from Prisma and write to CSV
+    # Get blobstore data from Prisma and write to CSV
 
     end_of_page = False
     offset = 0
+    incremental_id = 0
     page_limit = 50
-    tas_application_dict = dict()
+    application_list = list()
 
     while not end_of_page:
         (
-            tas_response,
+            tanzu_blobstore_response,
             status_code,
-        ) = prisma_get_images_scan_results(
-            prisma_token, offset=offset, limit=page_limit, collection=COLLECTIONS_FILTER
+        ) = prisma_get_tanzu_blob_store_scan_results(
+            prisma_token, offset=offset, limit=page_limit
         )
 
         if status_code == 200:
-            if tas_response:
+            if tanzu_blobstore_response:
                 ###############################################################
                 # Flatten application list for each blob
-                for tas in tas_response:
-                    external_labels = dict()
-                    if "externalLabels" in tas:
-                        for external_label in tas["externalLabels"]:
-                            if external_label["key"] in external_labels_to_include:
-                                external_labels.update(
-                                    {external_label["key"]: external_label["value"]}
-                                )
-                    # Grab base host information
-                    vulnerability_dict = {
-                        key: value
-                        for key, value in tas.items()
-                        if (key in tas_blobstore_application_fields_of_interest)
-                    }
 
-                    if tas["_id"] in tas_application_dict:
-                        tas_application_dict[tas["_id"]].append(vulnerability_dict)
-                    else:
-                        tas_application_dict.update({tas["_id"]: [vulnerability_dict]})
+                for blob in tanzu_blobstore_response:
+                    application_dict = {"Incremental_ID": incremental_id}
+                    # Grab base host information
+                    application_dict.update(
+                        {
+                            key: value
+                            for key, value in blob.items()
+                            if (key in tanzu_blobstore_application_fields_of_interest)
+                        }
+                    )
+
+                    application_list.append(application_dict)
+                    incremental_id += 1
 
                 offset += page_limit
             else:
@@ -154,48 +148,15 @@ def etl_tanzu_blobstore_applications_csv():
         else:
             logger.error("API returned %s.", status_code)
 
-    ###########################################################################
-    # Get collection IDs for TAS vulnerability correlation and write to CSV
-
-    end_of_page = False
-    offset = 0
-    LIMIT = 50
-    incremental_id = 0
-    csv_rows = list()
-
-    while not end_of_page:
-        containers_response, status_code = prisma_get_containers_scan_results(
-            prisma_token, offset=offset, limit=LIMIT, collection=COLLECTIONS_FILTER
-        )
-        if status_code == 200:
-            if containers_response:
-                for container in containers_response:
-                    IMAGE_ID = container["info"]["imageID"]
-                    if IMAGE_ID in tas_application_dict:
-                        for vuln in tas_application_dict[IMAGE_ID]:
-                            vuln.update({"Incremental_ID": incremental_id})
-
-                            csv_rows.append(vuln)
-
-                            incremental_id += 1
-
-                        # remove the image ID as it's already been added to the CSV
-                        tas_application_dict.pop(IMAGE_ID)
-
-            else:
-                end_of_page = True
-
-            offset += LIMIT
-        elif status_code == 401:
-            logger.error("Prisma token timed out, generating a new one and continuing.")
-
-            prisma_token = generate_prisma_token(prisma_access_key, prisma_secret_key)
-        else:
-            logger.error("API returned %s.", status_code)
-
-    if csv_rows:
+    ###############################################################
+    # Write to CSV
+    if application_list:
         write_csv_to_blob(
-            blob_name, csv_rows, tas_csv_fields, blob_client, new_file=True
+            blob_name,
+            application_list,
+            tanzu_csv_fields,
+            blob_client,
+            new_file=True,
         )
     else:
         logger.info("No data to write to CSV, it will not be created.")

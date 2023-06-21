@@ -187,7 +187,9 @@ def export_openshift_applications_csv_timer_trigger(timer: func.TimerRequest):
     ###########################################################################
     # Delete the CSV file if it exists from a previous run
     try:
-        container_client.delete_blob(blob_name)
+        for blob in container_client.list_blob_names():
+            if todays_date not in blob:
+                container_client.delete_blob(blob)
     except exceptions.ResourceNotFoundError:
         pass
 
@@ -317,7 +319,9 @@ def export_openshift_containers_csv(timer: func.TimerRequest):
     ###########################################################################
     # Delete the CSV file if it exists from a previous run
     try:
-        container_client.delete_blob(blob_name)
+        for blob in container_client.list_blob_names():
+            if todays_date not in blob:
+                container_client.delete_blob(blob)
     except exceptions.ResourceNotFoundError:
         pass
 
@@ -552,7 +556,9 @@ def export_openshift_image_vulnerability_csv(timer: func.TimerRequest):
     ###########################################################################
     # Delete the CSV file if it exists from a previous run
     try:
-        container_client.delete_blob(blob_name)
+        for blob in container_client.list_blob_names():
+            if todays_date not in blob:
+                container_client.delete_blob(blob)
     except exceptions.ResourceNotFoundError:
         pass
 
@@ -611,7 +617,9 @@ def export_host_applications_csv(timer: func.TimerRequest):
     ###########################################################################
     # Delete the CSV file if it exists from a previous run
     try:
-        container_client.delete_blob(blob_name)
+        for blob in container_client.list_blob_names():
+            if todays_date not in blob:
+                container_client.delete_blob(blob)
     except exceptions.ResourceNotFoundError:
         pass
 
@@ -728,7 +736,9 @@ def export_host_vulnerability_csv(timer: func.TimerRequest):
     ###########################################################################
     # Delete the CSV file if it exists from a previous run
     try:
-        container_client.delete_blob(blob_name)
+        for blob in container_client.list_blob_names():
+            if todays_date not in blob:
+                container_client.delete_blob(blob)
     except exceptions.ResourceNotFoundError:
         pass
 
@@ -974,7 +984,9 @@ def export_tas_containers_csv(timer: func.TimerRequest):
     ###########################################################################
     # Delete the CSV file if it exists from a previous run
     try:
-        container_client.delete_blob(blob_name)
+        for blob in container_client.list_blob_names():
+            if todays_date not in blob:
+                container_client.delete_blob(blob)
     except exceptions.ResourceNotFoundError:
         pass
 
@@ -1034,7 +1046,9 @@ def export_tas_vulnerability_csv(timer: func.TimerRequest):
     ###########################################################################
     # Delete the CSV file if it exists from a previous run
     try:
-        container_client.delete_blob(blob_name)
+        for blob in container_client.list_blob_names():
+            if todays_date not in blob:
+                container_client.delete_blob(blob)
     except exceptions.ResourceNotFoundError:
         pass
 
@@ -1268,7 +1282,9 @@ def export_tas_application_csv(timer: func.TimerRequest):
     ###########################################################################
     # Delete the CSV file if it exists from a previous run
     try:
-        container_client.delete_blob(blob_name)
+        for blob in container_client.list_blob_names():
+            if todays_date not in blob:
+                container_client.delete_blob(blob)
     except exceptions.ResourceNotFoundError:
         pass
 
@@ -1431,7 +1447,9 @@ def export_nexus_repo_application_csv(timer: func.TimerRequest):
     ###########################################################################
     # Delete the CSV file if it exists from a previous run
     try:
-        container_client.delete_blob(blob_name)
+        for blob in container_client.list_blob_names():
+            if todays_date not in blob:
+                container_client.delete_blob(blob)
     except exceptions.ResourceNotFoundError:
         pass
 
@@ -1561,7 +1579,9 @@ def export_nexus_repo_vulnerability_csv(timer: func.TimerRequest):
     ###########################################################################
     # Delete the CSV file if it exists from a previous run
     try:
-        container_client.delete_blob(blob_name)
+        for blob in container_client.list_blob_names():
+            if todays_date not in blob:
+                container_client.delete_blob(blob)
     except exceptions.ResourceNotFoundError:
         pass
 
@@ -1695,7 +1715,9 @@ def export_tanzu_blobstore_application_csv(timer: func.TimerRequest):
     ###########################################################################
     # Delete the CSV file if it exists from a previous run
     try:
-        container_client.delete_blob(blob_name)
+        for blob in container_client.list_blob_names():
+            if todays_date not in blob:
+                container_client.delete_blob(blob)
     except exceptions.ResourceNotFoundError:
         pass
 
@@ -1816,7 +1838,9 @@ def export_tanzu_blobstore_vulnerability_csv(timer: func.TimerRequest):
     ###########################################################################
     # Delete the CSV file if it exists from a previous run
     try:
-        container_client.delete_blob(blob_name)
+        for blob in container_client.list_blob_names():
+            if todays_date not in blob:
+                container_client.delete_blob(blob)
     except exceptions.ResourceNotFoundError:
         pass
 

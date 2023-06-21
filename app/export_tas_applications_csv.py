@@ -94,7 +94,9 @@ def etl_tas_application_csv():
     ###########################################################################
     # Delete the CSV file if it exists from a previous run
     try:
-        container_client.delete_blob(blob_name)
+        for blob in container_client.list_blob_names():
+            if todays_date not in blob:
+                container_client.delete_blob(blob)
     except exceptions.ResourceNotFoundError:
         pass
 
